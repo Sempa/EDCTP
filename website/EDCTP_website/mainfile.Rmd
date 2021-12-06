@@ -1,0 +1,89 @@
+---
+title: "Analysis and Interpretation of Dynamic Range of HIV Diagnostic Assays for Viral Load monitoring after Antiretroviral Therapy Initiation"
+author: "Dr Joseph B Sempa; [ORCID](https://orcid.org/0000-0003-1062-0417)"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+categories: ["R"]
+tags: ["HIV", "Epidemiology", "Statistics"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE)
+```
+This study is funded by the [EDCTP Career Developmen Fellowship](http://www.edctp.org/projects-2/edctp2-projects/career-development-fellowships-2019/), grant number:TMA2019CDF-2760
+
+# Abstract
+
+Even in the most optimistic scenarios in which HIV transmission is rapidly brought under control, there will be millions of people living with HIV for the foreseeable future. This is largely because antiretroviral medicines (ART), in most cases, enable people with HIV to have a fairly normal quality of life and life expectancy. Long-term HIV viral load (VL) monitoring, during ART, will pose major challenges as we seek to meet the third 90 of the UNAIDS 90 90 90 targets (90% of people on ART have essentially undetectable levels of circulating HIV in their blood).
+
+**VL Monitoring** is a key component of managing ART, but this involves specialised infrastructure and recurring costs. In the long term, most heavily HIV affected countries will require equitable and affordable ‘differentiated care’ policies and systems, wherein stable patients are not routinely scheduled for expensive clinician and laboratory work-up, but there are sensitive and efficient means to detect the need to escalate care and investigation.
+
+This project seeks to assess and enhance the laboratory monitoring of patients after initiating ART through:
+
+1.	**Intensive laboratory-based investigation, using existing specimens, of the temporal relationship between VL and HIV staging markers.** Collect longitudinal HIV antibody data by testing stored specimens and analyse the time-dependent interaction between HIV antibody and viral load response during ART. Also, analyse a case-control study of first-line treatment failure using HIV antibody response as the main exposure.
+
+2.	**Model-based investigation of the regimes (defined by sampling frequency and type of VL dynamics) in which immune-markers informatively track proxies of cumulative / averaged VL.** Simulate HIV antibody and viral load response data during ART and investigate the effect of various combinations of monitoring strategies between antibody and viral load response on treatment outcomes.   
+
+**The central biological/technological idea** behind this proposal is to benchmark the long-term interplay between ongoing viral infection and immune system markers. This offers prospects that laboratory tests will assess ‘average’ levels of viral replication over the period before testing, rather than just an on-the-spot value. This idea is already operationally adopted for the management of diabetes, where the so-called HbA1C marker provides an indication of glycemic control over a substantial period leading up to a test date.
+We hope this will ultimately lead to:
+
+* Efficient assessment of how well treatment is working
+* Improved epidemiological metrics gleaned from enhanced work up through routine care.
+
+
+# Introduction
+
+Patient monitoring of ART is a long-term challenge requiring efficient use of resources and maximally informative use of biomarkers. In particular, detecting suboptimal treatment, and efficiently/correctly identifying whether mal-adherence or resistance is the main underlying cause, is a matter of great health and financial impact, not to mention pressure on the drugs pipeline, where investment is expected to ultimately decline as the epidemic (hopefully) cools off over the next generation or two. Viral Load (VL) monitoring is currently not universal, is expensive, needs dedicated platforms, and provides a narrow time window of clinically relevant information.  In highly functional routine care settings outside of studies, plasma viral load is assessed about once a year (1). There may be significant practical value in more time-averaged markers of viral replication and suppression, such as immune system response markers that are measurable using routine diagnostic systems, and which naturally respond gradually to pathogen levels. This is conceptually analogous to the use of the HbA1C marker, which offers a more time-averaged marker of blood sugar levels, for management of diabetes, than does a single time point insulin level measurement (2).
+ 
+A previous study by Sempa et al. 2016 modelling effects of longitudinal viral load exposure attempted to model dynamics of viral load between 6-monthly intervals using time-lags (3) and subjects who were virally suppressed at 6monthly sampling intervals were considered suppressed throughout the interval. However, this assumption of viral suppression is potentially biased due to adherence challenges (4,5) and the occurrence of residual viremia between sampling intervals (6). Estimating viral dynamics between sampling intervals using time-lags may be simplistic, often not reflecting true viral dynamics within subjects. An important question remains whether quantifying viral load, between sampling intervals, will improve estimates of longitudinal viral load exposure during ART. The amount of exposure to longitudinal viral load has previously been associated with mortality (3), non-AIDS-related lymphomas (7) and CD4 count recovery (8).
+ 
+Selleri et al. 2007 showed that antibody trajectory keeps track of the viral load after ART start even in periods of treatment interruptions (9), however, they had data on only 4 subjects. Further, Keating et al 2017 (10), using assays developed for the purposes of infection staging in the sense of identifying ‘recent’ infections for surveillance (11), showed declining HIV antibodies during ART in early or late treated patients and Elite Controllers. However, these patients were sampled at specific time points straddling ART initiation and all these patients were suppressed after ART. The behaviour of HIV antibody and viral load response trajectories after ART initiation across different groups of viral suppression is still unknown.
+ 
+Serological diagnostic assays are the most fundamental component of any HIV treatment programme. Such assays and variants thereon are increasingly being used for surveillance purposes and are beginning to be used in routine HIV service delivery, at diagnosis in the President's Emergency Plan for AIDS Relief (PEPFAR) funded projects. To date, immuno-assays have not been systematically investigated for utility in **monitoring treatment stability and adherence.** This proposal seeks to study repurposing serological diagnostic assays and variants thereon, to provide meaningful correlates of time-averaged viral load. The working Hypothesis driving this project is that there is significant information about time-averaged / cumulative viral load in serological markers that can be obtained using diagnostic assays or minor variants on such assays. **Our investigation will involve the following specific aims:**
+ 
+**Specific aim 1:** To execute intensive laboratory-based investigation using existing specimens and determine the temporal relationship between VL and HIV antibody response.
+_Hypothesis 1:_ there is a positive correlation between HIV antibody and viral load response during antiretroviral therapy treatment
+_Hypothesis 2:_ patients who fail on first-line treatment are more likely to have been exposed to generally higher HIV antibody levels than patients who are not failing treatment.
+ 
+**Specific aim 2:** To determine which patient monitoring strategy (VL or HIV antibody) is better using model-based investigation of the regimes (defined by sampling frequency and type of VL dynamics) in which HIV antibody markers informatively track proxies of cumulative / averaged VL.
+_Hypothesis 3:_ viral load monitoring, alone, captures treatment outcomes timeously than HIV antibody monitoring and/or combinations of both monitoring strategies.
+ 
+Our study will establish what additional information can be gleaned from existing, high dynamic range diagnostic platforms when applied in contexts, where there is significant HIV treatment infrastructure.
+
+
+Originality
+
+* It took years to move from CD4 monitoring to VL monitoring – this project is getting an early start on looking at logistical, cost, and information content advances that may be achieved over the existing state-of-the-art VL monitoring, which is indeed facing constraints and long term questions
+
+* We are proposing new ad-hoc analytics for defining, detecting and interpreting ‘correlation’ between VL and serology
+
+# Methodology and Data analysis
+
+We are interested in previously described and readily available assays/biomarkers (11), which either have registered regulatory claims about utility for ‘HIV diagnosis’ or have passed some level of independent validation for utility in ‘HIV infection staging’ for surveillance purposes. There are numerous such immune assays for quantifying 1) antibody titre, 2) antibody ‘avidity’, and 3) Proportion of HIV specific antibodies in some class, such as IGg.
+ 
+Manufacturers of tests usually only register claims for a dichotomous classification into uninfected vs infected. In the last decade, there has been considerable investigation of off-label uses and procedure modifications, in order to exploit the fact that there is considerable inherent dynamic range in the biomarkers being measured and to investigate the potential for continuous interpretation. Most of this work has focused on population-level interpretation.
+ 
+There is significant utility, for the purposes of HIV treatment monitoring, in serological markers that can be obtained using diagnostic platforms or minor variants. This is not to suggest that a well-resourced treatment program is likely to dispense with VL monitoring, but that VL monitoring may not be necessary for all patients, and that serological markers may be adequate as first-line monitoring and can identify cases which need to be escalated in various ways. Our investigation of the specific aims will proceed in the following 8 sequential steps:
+
+1. Identifying existing data and available specimens from the Consortium for the Evaluation and Performance of HIV Incidence Assays (CEPHIA) repository, San Francisco, California, USA.
+2. Database Development and management using SQL
+3. Simulating Viral Load Dynamics
+4. Specialised testing on Informative Specimens at the Vitalant Research Institute Laboratory
+5. Descriptive Analysis of newly obtained antibody markers
+6. Correlation between VL and Antibody Markers
+7. Treatment monitoring algorithms 
+8. Implications: further studies and differentiated care
+
+# References
+
+1. Lecher S, Williams J, Fonjungo PN, Kim AA, Ellenberger D, Zhang G, et al. Progress with Scale-Up of HIV Viral Load Monitoring - Seven Sub-Saharan African Countries, January 2015-June 2016. MMWR Morb Mortal Wkly Rep [Internet]. 2016 Dec 2;65(47):1332–5. Available from: http://www.ncbi.nlm.nih.gov/pubmed/27906910
+2. Roche Diagnostics. cobas HbA1c Test 10 [Internet]. 2013 [cited 2019 Jan 22]. Available from: www.roche.com
+3. Sempa JB, Dushoff J, Daniels MJ, Castelnuovo B, Kiragga AN, Nieuwoudt M, et al. Reevaluating Cumulative HIV-1 Viral Load as a Prognostic Predictor: Predicting Opportunistic Infection Incidence and Mortality in a Ugandan Cohort. Am J Epidemiol [Internet]. 2016 Jul 1;184(1):67–77. Available from: http://www.ncbi.nlm.nih.gov/pubmed/27188943
+4. Choo PW, Rand CS, Inui TS, Lee ML, Cain E, Cordeiro-Breault M, et al. Validation of patient reports, automated pharmacy records, and pill counts with electronic monitoring of adherence to antihypertensive therapy. Med Care [Internet]. 1999 Sep;37(9):846–57. Available from: http://www.ncbi.nlm.nih.gov/pubmed/10493464
+5. Rudd P, Byyny RL, Zachary V, LoVerde ME, Titus C, Mitchell WD, et al. The natural history of medication compliance in a drug trial: limitations of pill counts. Clin Pharmacol Ther [Internet]. 1989 Aug;46(2):169–76. Available from: http://www.ncbi.nlm.nih.gov/pubmed/2667837
+6. Pinzone MR, Di Rosa M, Cacopardo B, Nunnari G. HIV RNA suppression and immune restoration: can we do better? Clin Dev Immunol [Internet]. 2012 Jan [cited 2014 May 28];2012:515962. Available from: http://www.pubmedcentral.nih.gov/articlerender.fcgi?artid=3318265&tool=pmcentrez&rendertype=abstract
+7. Zoufaly A, Stellbrink H-J, Heiden MA der, Kollan C, Hoffmann C, van Lunzen J, et al. Cumulative HIV viremia during highly active antiretroviral therapy is a strong predictor of AIDS-related lymphoma. J Infect Dis [Internet]. 2009 Jul 1 [cited 2014 Jun 24];200(1):79–87. Available from: http://www.ncbi.nlm.nih.gov/pubmed/19476437
+8. Selleri M, Orchi N, Zaniratti MS, Bellagamba R, Corpolongo A, Angeletti C, et al. Effective highly active antiretroviral therapy in patients with primary HIV-1 infection prevents the evolution of the avidity of HIV-1-specific antibodies. J Acquir Immune Defic Syndr [Internet]. 2007 Oct 1;46(2):145–50. Available from: http://www.ncbi.nlm.nih.gov/pubmed/17589369
+9. Keating SM, Pilcher CD, Jain V, Lebedeva M, Hampton D, Abdel-Mohsen M, et al. HIV Antibody Level as a Marker of HIV Persistence and Low-Level Viral Replication. J Infect Dis [Internet]. 2017 Jul 1;216(1):72–81. Available from: http://www.ncbi.nlm.nih.gov/pubmed/28498985
+10. Kassanjee R, Pilcher CD, Keating SM, Facente SN, McKinney E, Price MA, et al. Independent assessment of candidate HIV incidence assays on specimens in the CEPHIA repository. Aids. 2014;28(16):2439–49.
+11. Kassanjee R, Pilcher CD, Busch MP, Murphy G, Facente SN, Keating SM, et al. Viral load criteria and threshold optimization to improve HIV incidence assay characteristics. Aids. 2016;30(15):2361–71.
+12. Chang W, Cheng J, Allaire J, Xie Y, McPherson J. Shiny: Easy web applications in R. R package version 1.2.0 [Internet]. 2018. Available from: https://cran.r-project.org/package=shiny
