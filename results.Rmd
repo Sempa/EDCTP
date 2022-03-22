@@ -1,0 +1,14 @@
+---
+title: "Results"
+
+---
+
+
+
+
+```{r image_grobs, echo=FALSE, fig.show = "hold", out.width = "20%", fig.align = "default"}
+knitr::include_graphics(
+  c("03-Red_EDCTP.jpg",
+    "EU-flag.jpg")
+)
+```

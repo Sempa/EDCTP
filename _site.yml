@@ -1,0 +1,11 @@
+name: "personal-website"
+output_dir: "."
+navbar:
+  title: "Personal Website"
+  left:
+    - text: "Home"
+      href: index.html
+    - text: "Abstract"
+      href: about.html
+    - text: "Results"
+      href: results.html
