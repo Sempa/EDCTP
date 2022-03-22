@@ -1,15 +1,25 @@
 ---
-title: "Analysis and Interpretation of Dynamic Range of HIV Diagnostic Assays for Viral Load monitoring after Antiretroviral Therapy Initiation"
+title: Analysis and Interpretation of Dynamic Range of HIV Diagnostic Assays for Viral
+  Load monitoring after Antiretroviral Therapy Initiation
 author: "Dr Joseph B Sempa; [ORCID](https://orcid.org/0000-0003-1062-0417)"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-categories: ["R"]
-tags: ["HIV", "Epidemiology", "Statistics"]
+output:
+  html_document:
+    # df_print: paged
+    toc: TRUE
+    toc_float: TRUE
+tags:
+- HIV
+- Epidemiology
+- Statistics
+categories: R
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(collapse = TRUE)
 ```
-This study is funded by the [EDCTP Career Developmen Fellowship](http://www.edctp.org/projects-2/edctp2-projects/career-development-fellowships-2019/), grant number:TMA2019CDF-2760
+This project **TMA2019CDF-2760** is part of the EDCTP2 programme supported by the European Union
+<!-- This study is funded by the [EDCTP Career Developmen Fellowship](http://www.edctp.org/projects-2/edctp2-projects/career-development-fellowships-2019/), grant number:TMA2019CDF-2760 supported by the European Union -->
 
 # Abstract
 
@@ -87,3 +97,13 @@ There is significant utility, for the purposes of HIV treatment monitoring, in s
 10. Kassanjee R, Pilcher CD, Keating SM, Facente SN, McKinney E, Price MA, et al. Independent assessment of candidate HIV incidence assays on specimens in the CEPHIA repository. Aids. 2014;28(16):2439–49.
 11. Kassanjee R, Pilcher CD, Busch MP, Murphy G, Facente SN, Keating SM, et al. Viral load criteria and threshold optimization to improve HIV incidence assay characteristics. Aids. 2016;30(15):2361–71.
 12. Chang W, Cheng J, Allaire J, Xie Y, McPherson J. Shiny: Easy web applications in R. R package version 1.2.0 [Internet]. 2018. Available from: https://cran.r-project.org/package=shiny
+
+
+<!-- ![](03-Red_EDCTP.jpg){height='200'} -->
+<!-- ![](EU-flag.jpg){height = '200'} -->
+```{r, echo=FALSE, out.width="33%", fig.align = "left", fig.show='hold'}
+knitr::include_graphics(
+  c("03-Red_EDCTP.jpg",
+    "EU-flag.jpg")
+)
+```
