@@ -101,9 +101,10 @@ There is significant utility, for the purposes of HIV treatment monitoring, in s
 
 <!-- ![](03-Red_EDCTP.jpg){height='200'} -->
 <!-- ![](EU-flag.jpg){height = '200'} -->
+
 ```{r, echo=FALSE, out.width="33%", fig.align = "left", fig.show='hold'}
 knitr::include_graphics(
-  c("03-Red_EDCTP.jpg",
-    "EU-flag.jpg")
+ c("03-Red_EDCTP.jpg",
+   "EU-flag.jpg")
 )
 ```
