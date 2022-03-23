@@ -1,0 +1,26 @@
+---
+title: Analysis and Interpretation of Dynamic Range of HIV Diagnostic Assays for Viral
+  Load monitoring after Antiretroviral Therapy Initiation
+author: "Dr Joseph B Sempa; [ORCID](https://orcid.org/0000-0003-1062-0417)"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    # df_print: paged
+    toc: TRUE
+    toc_float: TRUE
+tags:
+- HIV
+- Epidemiology
+- Statistics
+categories: R
+---
+
+This project **TMA2019CDF-2760** is part of the EDCTP2 programme supported by the European Union
+
+
+```{r image_grobs, echo=FALSE, fig.show = "hold", out.width = "20%", fig.align = "default"}
+knitr::include_graphics(
+  c("03-Red_EDCTP.jpg",
+    "EU-flag.jpg")
+)
+```

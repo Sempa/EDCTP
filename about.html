@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+
+
+<title>Protocol summary</title>
+
+<script src="site_libs/header-attrs-2.13/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/bootstrap.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/default.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.tab('show');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">Personal Website</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li>
+  <a href="about.html">Abstract</a>
+</li>
+<li>
+  <a href="results.html">Results</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">Protocol summary</h1>
+
+</div>
+
+
+<div id="abstract" class="section level1">
+<h1>Abstract</h1>
+<p>Even in the most optimistic scenarios in which HIV transmission is rapidly brought under control, there will be millions of people living with HIV for the foreseeable future. This is largely because antiretroviral medicines (ART), in most cases, enable people with HIV to have a fairly normal quality of life and life expectancy. Long-term HIV viral load (VL) monitoring, during ART, will pose major challenges as we seek to meet the third 90 of the UNAIDS 90 90 90 targets (90% of people on ART have essentially undetectable levels of circulating HIV in their blood).</p>
+<p><strong>VL Monitoring</strong> is a key component of managing ART, but this involves specialised infrastructure and recurring costs. In the long term, most heavily HIV affected countries will require equitable and affordable ‘differentiated care’ policies and systems, wherein stable patients are not routinely scheduled for expensive clinician and laboratory work-up, but there are sensitive and efficient means to detect the need to escalate care and investigation.</p>
+<p>This project seeks to assess and enhance the laboratory monitoring of patients after initiating ART through:</p>
+<ol style="list-style-type: decimal">
+<li><p><strong>Intensive laboratory-based investigation, using existing specimens, of the temporal relationship between VL and HIV staging markers.</strong> Collect longitudinal HIV antibody data by testing stored specimens and analyse the time-dependent interaction between HIV antibody and viral load response during ART. Also, analyse a case-control study of first-line treatment failure using HIV antibody response as the main exposure.</p></li>
+<li><p><strong>Model-based investigation of the regimes (defined by sampling frequency and type of VL dynamics) in which immune-markers informatively track proxies of cumulative / averaged VL.</strong> Simulate HIV antibody and viral load response data during ART and investigate the effect of various combinations of monitoring strategies between antibody and viral load response on treatment outcomes.</p></li>
+</ol>
+<p><strong>The central biological/technological idea</strong> behind this proposal is to benchmark the long-term interplay between ongoing viral infection and immune system markers. This offers prospects that laboratory tests will assess ‘average’ levels of viral replication over the period before testing, rather than just an on-the-spot value. This idea is already operationally adopted for the management of diabetes, where the so-called HbA1C marker provides an indication of glycemic control over a substantial period leading up to a test date. We hope this will ultimately lead to:</p>
+<ul>
+<li>Efficient assessment of how well treatment is working</li>
+<li>Improved epidemiological metrics gleaned from enhanced work up through routine care.</li>
+</ul>
+</div>
+<div id="introduction" class="section level1">
+<h1>Introduction</h1>
+<p>Patient monitoring of ART is a long-term challenge requiring efficient use of resources and maximally informative use of biomarkers. In particular, detecting suboptimal treatment, and efficiently/correctly identifying whether mal-adherence or resistance is the main underlying cause, is a matter of great health and financial impact, not to mention pressure on the drugs pipeline, where investment is expected to ultimately decline as the epidemic (hopefully) cools off over the next generation or two. Viral Load (VL) monitoring is currently not universal, is expensive, needs dedicated platforms, and provides a narrow time window of clinically relevant information. In highly functional routine care settings outside of studies, plasma viral load is assessed about once a year (1). There may be significant practical value in more time-averaged markers of viral replication and suppression, such as immune system response markers that are measurable using routine diagnostic systems, and which naturally respond gradually to pathogen levels. This is conceptually analogous to the use of the HbA1C marker, which offers a more time-averaged marker of blood sugar levels, for management of diabetes, than does a single time point insulin level measurement (2).</p>
+<p>A previous study by Sempa et al. 2016 modelling effects of longitudinal viral load exposure attempted to model dynamics of viral load between 6-monthly intervals using time-lags (3) and subjects who were virally suppressed at 6monthly sampling intervals were considered suppressed throughout the interval. However, this assumption of viral suppression is potentially biased due to adherence challenges (4,5) and the occurrence of residual viremia between sampling intervals (6). Estimating viral dynamics between sampling intervals using time-lags may be simplistic, often not reflecting true viral dynamics within subjects. An important question remains whether quantifying viral load, between sampling intervals, will improve estimates of longitudinal viral load exposure during ART. The amount of exposure to longitudinal viral load has previously been associated with mortality (3), non-AIDS-related lymphomas (7) and CD4 count recovery (8).</p>
+<p>Selleri et al. 2007 showed that antibody trajectory keeps track of the viral load after ART start even in periods of treatment interruptions (9), however, they had data on only 4 subjects. Further, Keating et al 2017 (10), using assays developed for the purposes of infection staging in the sense of identifying ‘recent’ infections for surveillance (11), showed declining HIV antibodies during ART in early or late treated patients and Elite Controllers. However, these patients were sampled at specific time points straddling ART initiation and all these patients were suppressed after ART. The behaviour of HIV antibody and viral load response trajectories after ART initiation across different groups of viral suppression is still unknown.</p>
+<p>Serological diagnostic assays are the most fundamental component of any HIV treatment programme. Such assays and variants thereon are increasingly being used for surveillance purposes and are beginning to be used in routine HIV service delivery, at diagnosis in the President’s Emergency Plan for AIDS Relief (PEPFAR) funded projects. To date, immuno-assays have not been systematically investigated for utility in <strong>monitoring treatment stability and adherence.</strong> This proposal seeks to study repurposing serological diagnostic assays and variants thereon, to provide meaningful correlates of time-averaged viral load. The working Hypothesis driving this project is that there is significant information about time-averaged / cumulative viral load in serological markers that can be obtained using diagnostic assays or minor variants on such assays. <strong>Our investigation will involve the following specific aims:</strong></p>
+<p><strong>Specific aim 1:</strong> To execute intensive laboratory-based investigation using existing specimens and determine the temporal relationship between VL and HIV antibody response. <em>Hypothesis 1:</em> there is a positive correlation between HIV antibody and viral load response during antiretroviral therapy treatment <em>Hypothesis 2:</em> patients who fail on first-line treatment are more likely to have been exposed to generally higher HIV antibody levels than patients who are not failing treatment.</p>
+<p><strong>Specific aim 2:</strong> To determine which patient monitoring strategy (VL or HIV antibody) is better using model-based investigation of the regimes (defined by sampling frequency and type of VL dynamics) in which HIV antibody markers informatively track proxies of cumulative / averaged VL. <em>Hypothesis 3:</em> viral load monitoring, alone, captures treatment outcomes timeously than HIV antibody monitoring and/or combinations of both monitoring strategies.</p>
+<p>Our study will establish what additional information can be gleaned from existing, high dynamic range diagnostic platforms when applied in contexts, where there is significant HIV treatment infrastructure.</p>
+<p>Originality</p>
+<ul>
+<li><p>It took years to move from CD4 monitoring to VL monitoring – this project is getting an early start on looking at logistical, cost, and information content advances that may be achieved over the existing state-of-the-art VL monitoring, which is indeed facing constraints and long term questions</p></li>
+<li><p>We are proposing new ad-hoc analytics for defining, detecting and interpreting ‘correlation’ between VL and serology</p></li>
+</ul>
+</div>
+<div id="methodology-and-data-analysis" class="section level1">
+<h1>Methodology and Data analysis</h1>
+<p>We are interested in previously described and readily available assays/biomarkers (11), which either have registered regulatory claims about utility for ‘HIV diagnosis’ or have passed some level of independent validation for utility in ‘HIV infection staging’ for surveillance purposes. There are numerous such immune assays for quantifying 1) antibody titre, 2) antibody ‘avidity’, and 3) Proportion of HIV specific antibodies in some class, such as IGg.</p>
+<p>Manufacturers of tests usually only register claims for a dichotomous classification into uninfected vs infected. In the last decade, there has been considerable investigation of off-label uses and procedure modifications, in order to exploit the fact that there is considerable inherent dynamic range in the biomarkers being measured and to investigate the potential for continuous interpretation. Most of this work has focused on population-level interpretation.</p>
+<p>There is significant utility, for the purposes of HIV treatment monitoring, in serological markers that can be obtained using diagnostic platforms or minor variants. This is not to suggest that a well-resourced treatment program is likely to dispense with VL monitoring, but that VL monitoring may not be necessary for all patients, and that serological markers may be adequate as first-line monitoring and can identify cases which need to be escalated in various ways. Our investigation of the specific aims will proceed in the following 8 sequential steps:</p>
+<ol style="list-style-type: decimal">
+<li>Identifying existing data and available specimens from the Consortium for the Evaluation and Performance of HIV Incidence Assays (CEPHIA) repository, San Francisco, California, USA.</li>
+<li>Database Development and management using SQL</li>
+<li>Simulating Viral Load Dynamics</li>
+<li>Specialised testing on Informative Specimens at the Vitalant Research Institute Laboratory</li>
+<li>Descriptive Analysis of newly obtained antibody markers</li>
+<li>Correlation between VL and Antibody Markers</li>
+<li>Treatment monitoring algorithms</li>
+<li>Implications: further studies and differentiated care</li>
+</ol>
+</div>
+<div id="references" class="section level1">
+<h1>References</h1>
+<ol style="list-style-type: decimal">
+<li>Lecher S, Williams J, Fonjungo PN, Kim AA, Ellenberger D, Zhang G, et al. Progress with Scale-Up of HIV Viral Load Monitoring - Seven Sub-Saharan African Countries, January 2015-June 2016. MMWR Morb Mortal Wkly Rep [Internet]. 2016 Dec 2;65(47):1332–5. Available from: <a href="http://www.ncbi.nlm.nih.gov/pubmed/27906910" class="uri">http://www.ncbi.nlm.nih.gov/pubmed/27906910</a></li>
+<li>Roche Diagnostics. cobas HbA1c Test 10 [Internet]. 2013 [cited 2019 Jan 22]. Available from: www.roche.com</li>
+<li>Sempa JB, Dushoff J, Daniels MJ, Castelnuovo B, Kiragga AN, Nieuwoudt M, et al. Reevaluating Cumulative HIV-1 Viral Load as a Prognostic Predictor: Predicting Opportunistic Infection Incidence and Mortality in a Ugandan Cohort. Am J Epidemiol [Internet]. 2016 Jul 1;184(1):67–77. Available from: <a href="http://www.ncbi.nlm.nih.gov/pubmed/27188943" class="uri">http://www.ncbi.nlm.nih.gov/pubmed/27188943</a></li>
+<li>Choo PW, Rand CS, Inui TS, Lee ML, Cain E, Cordeiro-Breault M, et al. Validation of patient reports, automated pharmacy records, and pill counts with electronic monitoring of adherence to antihypertensive therapy. Med Care [Internet]. 1999 Sep;37(9):846–57. Available from: <a href="http://www.ncbi.nlm.nih.gov/pubmed/10493464" class="uri">http://www.ncbi.nlm.nih.gov/pubmed/10493464</a></li>
+<li>Rudd P, Byyny RL, Zachary V, LoVerde ME, Titus C, Mitchell WD, et al. The natural history of medication compliance in a drug trial: limitations of pill counts. Clin Pharmacol Ther [Internet]. 1989 Aug;46(2):169–76. Available from: <a href="http://www.ncbi.nlm.nih.gov/pubmed/2667837" class="uri">http://www.ncbi.nlm.nih.gov/pubmed/2667837</a></li>
+<li>Pinzone MR, Di Rosa M, Cacopardo B, Nunnari G. HIV RNA suppression and immune restoration: can we do better? Clin Dev Immunol [Internet]. 2012 Jan [cited 2014 May 28];2012:515962. Available from: <a href="http://www.pubmedcentral.nih.gov/articlerender.fcgi?artid=3318265&amp;tool=pmcentrez&amp;rendertype=abstract" class="uri">http://www.pubmedcentral.nih.gov/articlerender.fcgi?artid=3318265&amp;tool=pmcentrez&amp;rendertype=abstract</a></li>
+<li>Zoufaly A, Stellbrink H-J, Heiden MA der, Kollan C, Hoffmann C, van Lunzen J, et al. Cumulative HIV viremia during highly active antiretroviral therapy is a strong predictor of AIDS-related lymphoma. J Infect Dis [Internet]. 2009 Jul 1 [cited 2014 Jun 24];200(1):79–87. Available from: <a href="http://www.ncbi.nlm.nih.gov/pubmed/19476437" class="uri">http://www.ncbi.nlm.nih.gov/pubmed/19476437</a></li>
+<li>Selleri M, Orchi N, Zaniratti MS, Bellagamba R, Corpolongo A, Angeletti C, et al. Effective highly active antiretroviral therapy in patients with primary HIV-1 infection prevents the evolution of the avidity of HIV-1-specific antibodies. J Acquir Immune Defic Syndr [Internet]. 2007 Oct 1;46(2):145–50. Available from: <a href="http://www.ncbi.nlm.nih.gov/pubmed/17589369" class="uri">http://www.ncbi.nlm.nih.gov/pubmed/17589369</a></li>
+<li>Keating SM, Pilcher CD, Jain V, Lebedeva M, Hampton D, Abdel-Mohsen M, et al. HIV Antibody Level as a Marker of HIV Persistence and Low-Level Viral Replication. J Infect Dis [Internet]. 2017 Jul 1;216(1):72–81. Available from: <a href="http://www.ncbi.nlm.nih.gov/pubmed/28498985" class="uri">http://www.ncbi.nlm.nih.gov/pubmed/28498985</a></li>
+<li>Kassanjee R, Pilcher CD, Keating SM, Facente SN, McKinney E, Price MA, et al. Independent assessment of candidate HIV incidence assays on specimens in the CEPHIA repository. Aids. 2014;28(16):2439–49.</li>
+<li>Kassanjee R, Pilcher CD, Busch MP, Murphy G, Facente SN, Keating SM, et al. Viral load criteria and threshold optimization to improve HIV incidence assay characteristics. Aids. 2016;30(15):2361–71.</li>
+<li>Chang W, Cheng J, Allaire J, Xie Y, McPherson J. Shiny: Easy web applications in R. R package version 1.2.0 [Internet]. 2018. Available from: <a href="https://cran.r-project.org/package=shiny" class="uri">https://cran.r-project.org/package=shiny</a></li>
+</ol>
+<p><img src="03-Red_EDCTP.jpg" width="20%" /><img src="EU-flag.jpg" width="20%" /></p>
+</div>
+
+
+
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
