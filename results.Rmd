@@ -1,7 +1,7 @@
 ---
-title: "Results"
-
+title: " "
 ---
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(cache=TRUE)
@@ -20,9 +20,7 @@ library(splines)
 library(cowplot)
 ```
 
-
-
-## Pateints' demographic and clinical characteristics
+## Patients' demographic and clinical characteristics
 
 
 ```{r, message = FALSE, cache = TRUE, warning=FALSE, echo = FALSE, results='asis'}
@@ -52,7 +50,8 @@ dt01
 
 Majority 18 out of 19 patients were Males, with HIV sub-type B. They had a 1213 days (IQR: 1087,1352) on since the start of treatment.
 
-## Ploting a patients' HIV viral load and HIV antibody response before and after Antiretroviral therapy intiation among early suppressors
+## Plotting a patients' HIV viral load and HIV antibody response before and after Antiretroviral therapy initiation among early suppressors
+
 
 
 ```{r, message = FALSE, cache = TRUE, warning=FALSE, echo = FALSE, results='asis'}
@@ -123,7 +122,9 @@ ncol = 1#,
 
 The thick blue line indicates a smoothed line for either viral load or HIV antibody response drawn using B-splines with 3 knots on time since patients were initiated on ART
 
-# Viral load Antibody model
+
+
+# Viral load and antibody model
 
 
 ```{r, message = FALSE, cache = TRUE, warning=FALSE, echo = FALSE, results='asis'}
@@ -136,8 +137,6 @@ model2 <- nlme::lme(fixed = logvl ~ Group + hiv_antibody_value + bs(time_on_trt,
 sjPlot::tab_model(model2, show.icc = FALSE, show.re.var = FALSE)
 
 ```
-
-
 
 ```{r image_grobs, echo=FALSE, fig.show = "hold", out.width = "20%", fig.align = "default"}
 knitr::include_graphics(
