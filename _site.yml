@@ -1,11 +1,11 @@
-name: "personal-website"
+name: "HIV_Patient_Monitoring"
 output_dir: "."
 navbar:
-  title: "Personal Website"
+  title: "HIV Patient Monitoring"
   left:
     - text: "Home"
       href: index.html
-    - text: "Abstract"
+    - text: "Protocol summary"
       href: about.html
     - text: "Results"
       href: results.html
