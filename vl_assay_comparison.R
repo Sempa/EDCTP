@@ -170,9 +170,10 @@ data_generated <- sedia_generic %>%
   filter(n_visits>1) %>%
   ungroup() %>%
   mutate(time_on_trt = as.numeric(test_date - art_initiation_date),
-         `Sedia LAg Odn screen` = sedia_ODn) %>%
+         `Sedia LAg Odn screen` = sedia_ODn,
+         vl_detectable = as.factor(ifelse((viral_load) <=400, 0, ifelse(viral_load >400, 1, NA)))) %>%
   dplyr::select(subject_label_blinded, test_date, art_initiation_date, time_on_trt, 
-                `Sedia LAg Odn screen`, sedia_ODn, viral_load, n_visits) %>% #, inter_test_interval
+                `Sedia LAg Odn screen`, sedia_ODn, viral_load, n_visits, vl_detectable) %>% #, inter_test_interval
   arrange(subject_label_blinded, test_date)
 
 data_generated_with_suppression <- sedia_generic %>%
@@ -206,10 +207,9 @@ model_cephia_2 <- nlme::lme(fixed = log10(viral_load) ~ sedia_ODn, #+ bs(time_on
 )
 summary(model_cephia_2)
 
-model_cephia_2_suppressed <- nlme::lme(fixed = log10(viral_load) ~ sedia_ODn, #+ bs(time_on_trt, 3)
+model_cephia_2_suppressed <- nlme::lme(fixed = log10(viral_load) ~ vl_detectable:sedia_ODn, #+ bs(time_on_trt, 3)
                                        random = ~ 1 | subject_label_blinded,
-                                       data = data_generated_with_suppression %>%
-                                         filter(time_on_trt>=0),
+                                       data = data_generated,
                                        na.action = na.exclude, control = lmeControl(opt = "optim")
 )
 summary(model_cephia_2_suppressed)
