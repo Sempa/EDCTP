@@ -163,17 +163,17 @@ data_generated <- sedia_generic %>%
   distinct(subject_label_blinded, test_date, .keep_all = T) %>%
   filter(!is.na(viral_load)) %>%
   group_by(subject_label_blinded) %>%
-  # mutate(inter_test_interval = c(30, diff(test_date))) %>%
-  # filter(inter_test_interval>=30) %>% #removing visits that are less than two months apart. CEPHIA has some visits that are even one day apart
+  mutate(inter_test_interval = c(30, diff(test_date))) %>%
+  filter(inter_test_interval>=30) %>% #removing visits that are less than two months apart. CEPHIA has some visits that are even one day apart
   mutate(mean_vl = mean(viral_load)) %>%
-  mutate(suprressed_throughout_followup = ifelse(mean_vl<=40, 1,0)) %>%
+  mutate(suprressed_throughout_followup = ifelse(mean_vl<=400, 1,0)) %>%
   mutate(visits = 1:length(subject_label_blinded)) %>%
   mutate(n_visits = max(visits)) %>%
   filter(n_visits>1) %>%
   ungroup() %>%
   mutate(time_on_trt = as.numeric(test_date - art_initiation_date),
          `Sedia LAg Odn screen` = sedia_ODn,
-         vl_detectable = (ifelse((viral_load) <=40, 0, ifelse(viral_load >40, 1, NA)))
+         vl_detectable = (ifelse((viral_load) <=400, 0, ifelse(viral_load >400, 1, NA)))
          ) %>%
   dplyr::select(subject_label_blinded, test_date, art_initiation_date, time_on_trt, 
                 `Sedia LAg Odn screen`, sedia_ODn, viral_load, n_visits, suprressed_throughout_followup, vl_detectable) %>% #, vl_detectable, inter_test_interval
@@ -188,7 +188,7 @@ model_cephia_2 <- nlme::lme(fixed = log10(viral_load) ~ sedia_ODn, #+ bs(time_on
 summary(model_cephia_2)
 
 linear_reg_function <- function(dat, type) {
-  browser()
+  # browser()
   if (type == 1) {
     if (dat$suprressed_throughout_followup == 0) {
       model <- glm(
@@ -244,6 +244,16 @@ for (i in 1:length(unique(unsuppressed_visit$subject_label_blinded))) {
 mean(model_data$slope, na.rm = T)
 summary(lm(slope~1, data = model_data))
 
+model_data%>%
+  ggplot(aes(x=slope, type=suppressed)) +
+  geom_histogram( color="#e9ecef", alpha=0.6, position = 'identity') +
+  scale_fill_manual(values=c("#69b3a2", "#404080")) +
+  labs(fill="") +
+  geom_density(lwd = 1.2,
+               linetype = 2,
+               colour = 2
+               )
+
 #####dealing with suppressed visits
 model_data_supp <- data.frame(id=NA, intercept = NA, slope = NA, suppressed=NA)
 counter <- 0
@@ -262,19 +272,40 @@ model_data_supp%>%
   ggplot(aes(x=slope, type=suppressed)) +
   geom_histogram( color="#e9ecef", alpha=0.6, position = 'identity') +
   scale_fill_manual(values=c("#69b3a2", "#404080")) +
-  theme_ipsum() +
-  labs(fill="")
+  labs(fill="") +
+  geom_density(lwd = 1.2,
+               linetype = 2,
+               colour = 2
+               )
+
 cols <- c("#F76D5E", "#FFFFBF")#, "#72D8FF"
 v=rbind(model_data, model_data_supp) %>%
   filter(!is.na(slope)) %>%
-  # filter(slope>-10) %>%
-  # filter(slope<5) %>%
   ggplot(aes(x = slope, colour = as.factor(suppressed))) +
     geom_density(lwd = 1.2, linetype = 1) + 
   scale_color_manual(values = cols)
 v
 
+##Adding noise to the model for those who are suppressed
+set.seed(11)
+suppressed_visit_withnoise <- suppressed_visit %>%
+  group_by(subject_label_blinded) %>%
+  mutate(noise = rnorm(n = length(subject_label_blinded), mean = 0, sd = .1e-1)) %>%
+  mutate(sedia_ODn = sedia_ODn-noise)
 
+model_data_supp_noise <- data.frame(id=NA, intercept = NA, slope = NA, suppressed=NA)
+counter <- 0
+for (i in 1:length(unique(suppressed_visit_withnoise$subject_label_blinded))) {
+  counter <- counter + 1
+  model_data_supp_noise[counter,] <- linear_reg_function(dat = subset(suppressed_visit_withnoise, suppressed_visit_withnoise$subject_label_blinded== unique(suppressed_visit_withnoise$subject_label_blinded)[i]),
+                                                   type = 2)
+}
+
+mean(model_data_supp_noise$slope, na.rm = T)
+summary(lm(slope~1, data = model_data_supp_noise))
+
+
+#################################################################
 after_ART <- final_dataset %>%
   mutate(subject_label_blinded = as.character(subject_label_blinded)) %>%
   filter(time_on_trt>=0) %>%
