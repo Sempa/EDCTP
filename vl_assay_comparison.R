@@ -8,6 +8,7 @@ library(nlme)
 library(splines)
 library(cowplot)
 
+source('estimate_measurement_noise_dist.R')
 final_dataset <- read_csv("Sempa_final_pull_with_results.csv") %>%
   mutate(vl = ifelse(`Viral Load at Draw`== '<40', '40', ifelse(`Viral Load at Draw`=='NULL', "", `Viral Load at Draw`))) %>%
   mutate(logvl = log(as.numeric(vl),10),
@@ -154,38 +155,57 @@ sedia_generic <- read_csv("data/20180410-EP-LAgSedia-Generic.csv") %>%
   rename(sedia_ODn = result...72) %>%
   filter(visit_id != 21773 & visit_id != 21783 & visit_id != 21785)
 data_generated <- sedia_generic %>%
-  select(subject_label_blinded, test_date, art_initiation_date, aids_diagnosis_date, 
+  select(subject_label_blinded, test_date, sedia_ODn, viral_load, art_initiation_date, aids_diagnosis_date, 
          art_interruption_date, art_resumption_date, treatment_naive, 
-         on_treatment, first_treatment, sedia_ODn, viral_load) %>%
+         on_treatment, first_treatment) %>%
+  # arrange(subject_label_blinded, test_date)
   filter(!is.na(art_initiation_date)) %>%
   arrange(subject_label_blinded, test_date) %>%
   filter(!is.na(sedia_ODn)) %>%
   distinct(subject_label_blinded, test_date, .keep_all = T) %>%
   filter(!is.na(viral_load)) %>%
   group_by(subject_label_blinded) %>%
-  mutate(inter_test_interval = c(30, diff(test_date))) %>%
-  filter(inter_test_interval>=30) %>% #removing visits that are less than two months apart. CEPHIA has some visits that are even one day apart
+  # mutate(inter_test_interval = c(30, diff(test_date))) %>%
+  # filter(inter_test_interval>=30) %>% #removing visits that are less than two months apart. CEPHIA has some visits that are even one day apart
   mutate(mean_vl = mean(viral_load)) %>%
-  mutate(suprressed_throughout_followup = ifelse(mean_vl<=400, 1,0)) %>%
+  mutate(suprressed_throughout_followup = ifelse(mean_vl<=405, 1,0)) %>%
   mutate(visits = 1:length(subject_label_blinded)) %>%
   mutate(n_visits = max(visits)) %>%
   filter(n_visits>1) %>%
   ungroup() %>%
   mutate(time_on_trt = as.numeric(test_date - art_initiation_date),
          `Sedia LAg Odn screen` = sedia_ODn,
-         vl_detectable = (ifelse((viral_load) <=400, 0, ifelse(viral_load >400, 1, NA)))
+         vl_detectable = (ifelse((viral_load) <=412, 0, ifelse(viral_load >412, 1, NA)))
          ) %>%
+  filter(time_on_trt>=0) %>%
   dplyr::select(subject_label_blinded, test_date, art_initiation_date, time_on_trt, 
                 `Sedia LAg Odn screen`, sedia_ODn, viral_load, n_visits, suprressed_throughout_followup, vl_detectable) %>% #, vl_detectable, inter_test_interval
   arrange(subject_label_blinded, test_date)
 
 model_cephia_2 <- nlme::lme(fixed = log10(viral_load) ~ sedia_ODn, #+ bs(time_on_trt, 3)
                            random = ~ 1 | subject_label_blinded,
-                           data = data_generated %>%
-                             filter(time_on_trt>=0),
-                           na.action = na.exclude, control = lmeControl(opt = "optim")
+                           data = data_generated,
+                           na.action = na.exclude#, control = lmeControl(opt = "optim")
 )
 summary(model_cephia_2)
+
+model_cephia_3 <- nlme::lme(fixed = log10(viral_load) ~ sedia_ODn + sedia_ODn * vl_detectable, #+ bs(time_on_trt, 3)
+                            random = ~ 1 | subject_label_blinded,
+                            data = data_generated,
+                            na.action = na.exclude#, control = lmeControl(opt = "optim")
+)
+summary(model_cephia_3)
+
+model_cephia_4 <- nlme::lme(fixed = (sedia_ODn_with_noise) ~ time_on_trt, #+ bs(time_on_trt, 3)
+                            random = ~ 1 | subject_label_blinded,
+                            data = data_generated %>%
+                              filter(vl_detectable==0) %>%
+                              group_by(subject_label_blinded) %>%
+                              mutate(noise = rnorm(n = length(subject_label_blinded), mean = 0, sd = .1e-1)) %>%
+                              mutate(sedia_ODn_with_noise = ifelse(sedia_ODn-(noise*sedia_ODn) <0, 0, sedia_ODn-(noise*sedia_ODn))),
+                            na.action = na.exclude
+)
+summary(model_cephia_4)
 
 linear_reg_function <- function(dat, type) {
   # browser()
@@ -218,7 +238,7 @@ linear_reg_function <- function(dat, type) {
       )
     } else if (dat$vl_detectable == 0) {
       model <- glm(
-        formula = sedia_ODn ~ time_on_trt,
+        formula = sedia_ODn_with_noise ~ time_on_trt,
         family = gaussian,
         data = dat
       )
@@ -241,8 +261,8 @@ for (i in 1:length(unique(unsuppressed_visit$subject_label_blinded))) {
   model_data[counter,] <- linear_reg_function(dat = subset(unsuppressed_visit, unsuppressed_visit$subject_label_blinded== unique(unsuppressed_visit$subject_label_blinded)[i]),
                                               type = 2)
 }
-mean(model_data$slope, na.rm = T)
-summary(lm(slope~1, data = model_data))
+summary(model_data$slope, na.rm = T)
+# summary(lm(slope~1, data = model_data))
 
 model_data%>%
   ggplot(aes(x=slope, type=suppressed)) +
@@ -265,8 +285,8 @@ for (i in 1:length(unique(suppressed_visit$subject_label_blinded))) {
                                               type = 2)
 }
 
-mean(model_data_supp$slope, na.rm = T)
-summary(lm(slope~1, data = model_data_supp))
+summary(model_data_supp$slope, na.rm = T)
+# summary(lm(slope~1, data = model_data_supp))
 
 model_data_supp%>%
   ggplot(aes(x=slope, type=suppressed)) +
@@ -282,16 +302,15 @@ cols <- c("#F76D5E", "#FFFFBF")#, "#72D8FF"
 v=rbind(model_data, model_data_supp) %>%
   filter(!is.na(slope)) %>%
   ggplot(aes(x = slope, colour = as.factor(suppressed))) +
-    geom_density(lwd = 1.2, linetype = 1) + 
+    geom_density(lwd = 1.2, linetype = 1) +
   scale_color_manual(values = cols)
 v
 
 ##Adding noise to the model for those who are suppressed
-set.seed(11)
 suppressed_visit_withnoise <- suppressed_visit %>%
   group_by(subject_label_blinded) %>%
   mutate(noise = rnorm(n = length(subject_label_blinded), mean = 0, sd = .1e-1)) %>%
-  mutate(sedia_ODn = sedia_ODn-noise)
+  mutate(sedia_ODn_with_noise = ifelse(sedia_ODn-(noise*sedia_ODn) <0, 0, sedia_ODn-(noise*sedia_ODn)))
 
 model_data_supp_noise <- data.frame(id=NA, intercept = NA, slope = NA, suppressed=NA)
 counter <- 0
@@ -301,9 +320,19 @@ for (i in 1:length(unique(suppressed_visit_withnoise$subject_label_blinded))) {
                                                    type = 2)
 }
 
-mean(model_data_supp_noise$slope, na.rm = T)
-summary(lm(slope~1, data = model_data_supp_noise))
+summary(model_data_supp_noise$slope, na.rm = T)
+# summary(lm(slope~1, data = model_data_supp_noise))
 
+model_data_supp_noise%>%
+  filter(!is.na(slope)) %>%
+  ggplot(aes(x=slope, type = suppressed)) +
+  geom_histogram( color="#e9ecef", alpha=0.6, position = 'identity') +
+  scale_fill_manual(values=c("#69b3a2", "#404080")) +
+  labs(fill="") +
+  geom_density(lwd = 1.2,
+               # linetype = 2,
+               colour = 2
+               )
 
 #################################################################
 after_ART <- final_dataset %>%
