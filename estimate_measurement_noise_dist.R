@@ -48,9 +48,9 @@ sd_sedia_ODn_vs_ODn_bc <- sedia_distribution_blinded_controls %>%
 sd_sedia_ODn_vs_ODn_bc
 
 noise <- summary(glm(sd_Sedia_ODn ~ mean_Sedia_ODn, data = sedia_distribution_blinded_controls %>%
-  mutate(sd_Sedia_ODn = `sigma over mean ODn`, mean_Sedia_ODn = `mean Sedia ODn`)
+  mutate(sd_Sedia_ODn = `sigma Sedia ODn`, mean_Sedia_ODn = `mean Sedia ODn`)
   )
-  )$coefficients[2,1]
+  )
 
 sigma_ODn_vs_ODn_bc <- sedia_distribution_blinded_controls %>%
   ggplot(aes(x = `mean Sedia ODn`, y = `sigma over mean ODn`)) +
