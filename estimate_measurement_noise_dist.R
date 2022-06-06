@@ -126,6 +126,10 @@ sd_sedia_ODn_vs_ODn<- close_per_patient_visits_new %>%
   geom_smooth(method = lm, size = 1.5, se = FALSE)
 
 sd_sedia_ODn_vs_ODn
+summary(glm(sigma_Sedia_ODn ~ mean_Sedia_ODn, data = close_per_patient_visits_new %>%
+              mutate(sigma_Sedia_ODn = `sigma Sedia ODn`, mean_Sedia_ODn = `mean Sedia ODn`)
+)
+)
 
 sigma_ODn_vs_ODn <- close_per_patient_visits_new %>%
   ggplot(aes(x = `mean Sedia ODn`, y = `sigma over mean ODn`)) +
@@ -134,7 +138,7 @@ sigma_ODn_vs_ODn <- close_per_patient_visits_new %>%
   geom_smooth(method = lm, size = 1.5, se = FALSE)
 
 sigma_ODn_vs_ODn
-summary(glm(sigma_ODn ~ mean_Sedia_ODn, data = close_per_patient_visits_new %>%
-              mutate(sigma_ODn = `sigma over mean ODn`, mean_Sedia_ODn = `mean Sedia ODn`)
+summary(glm(sigma_over_mean_ODn ~ mean_Sedia_ODn, data = close_per_patient_visits_new %>%
+              mutate(sigma_over_mean_ODn = `sigma over mean ODn`, mean_Sedia_ODn = `mean Sedia ODn`)
             )
         )

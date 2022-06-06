@@ -178,16 +178,24 @@ data_generated <- sedia_generic %>%
     on_treatment, first_treatment
   ) %>%
   # arrange(subject_label_blinded, test_date)
-  filter(!is.na(art_initiation_date)) %>%
+  # filter(!is.na(art_initiation_date)) %>%
   arrange(subject_label_blinded, test_date) %>%
-  filter(!is.na(sedia_ODn)) %>%
+  # filter(!is.na(sedia_ODn)) %>%
   distinct(subject_label_blinded, test_date, .keep_all = T) %>%
   filter(!is.na(viral_load)) %>%
   group_by(subject_label_blinded) %>%
   # mutate(inter_test_interval = c(30, diff(test_date))) %>%
   # filter(inter_test_interval>=30) %>% #removing visits that are less than two months apart. CEPHIA has some visits that are even one day apart
-  mutate(mean_vl = mean(viral_load)) %>%
-  mutate(suprressed_throughout_followup = ifelse(mean_vl <= 412, 1, 0)) %>%
+  mutate(flagvl_100 = ifelse(viral_load<=100, 0,1),
+         flagvl_400 = ifelse(viral_load<=400, 0,1),
+         flagvl_1000 = ifelse(viral_load<=1000, 0,1)) %>%
+  mutate(suprressed_throughout_followup_100 = ifelse(mean(flagvl_100) == 0 , 1, 0),
+         suprressed_throughout_followup_400 = ifelse(mean(flagvl_400) ==0 , 1, 0),
+         suprressed_throughout_followup_1000 = ifelse(mean(flagvl_1000) == 0 , 1, 0)
+         ) %>% 
+  # select(subject_label_blinded, test_date, viral_load,
+  #        suprressed_throughout_followup_100, suprressed_throughout_followup_400, suprressed_throughout_followup_1000) %>%
+  # filter(suprressed_throughout_followup_100==1)
   mutate(visits = 1:length(subject_label_blinded)) %>%
   mutate(n_visits = max(visits)) %>%
   filter(n_visits > 1) %>%
@@ -195,7 +203,9 @@ data_generated <- sedia_generic %>%
   mutate(
     time_on_trt = as.numeric(test_date - art_initiation_date),
     `Sedia LAg Odn screen` = sedia_ODn,
-    vl_detectable = (ifelse((viral_load) <= 412, 0, ifelse(viral_load > 412, 1, NA)))
+    vl_detectable_100 = (ifelse((viral_load) <= 100, 0, ifelse(viral_load > 100, 1, NA))),
+    vl_detectable_400 = (ifelse((viral_load) <= 400, 0, ifelse(viral_load > 400, 1, NA))),
+    vl_detectable_1000 = (ifelse((viral_load) <= 1000, 0, ifelse(viral_load > 1000, 1, NA)))
   ) %>%
   filter(time_on_trt >= 0) %>%
   dplyr::select(
@@ -203,6 +213,13 @@ data_generated <- sedia_generic %>%
     `Sedia LAg Odn screen`, sedia_ODn, viral_load, n_visits, suprressed_throughout_followup, vl_detectable
   ) %>% # , vl_detectable, inter_test_interval
   arrange(subject_label_blinded, test_date)
+
+
+x=data_generated %>% 
+  select(subject_label_blinded, test_date, viral_load, mean_vl, 
+         suprressed_throughout_followup_100, suprressed_throughout_followup_400, suprressed_throughout_followup_1000) %>%
+  filter(suprressed_throughout_followup_100<=100)
+
 
 model_cephia_2 <- nlme::lme(
   fixed = log10(viral_load) ~ sedia_ODn, #+ bs(time_on_trt, 3)
