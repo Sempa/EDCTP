@@ -199,20 +199,20 @@ data_generated <- sedia_generic %>%
   mutate(visits = 1:length(subject_label_blinded)) %>%
   mutate(n_visits = max(visits)) %>%
   filter(n_visits > 1) %>%
-  ungroup() %>%
-  mutate(
-    time_on_trt = as.numeric(test_date - art_initiation_date),
-    `Sedia LAg Odn screen` = sedia_ODn,
-    vl_detectable_100 = (ifelse((viral_load) <= 100, 0, ifelse(viral_load > 100, 1, NA))),
-    vl_detectable_400 = (ifelse((viral_load) <= 400, 0, ifelse(viral_load > 400, 1, NA))),
-    vl_detectable_1000 = (ifelse((viral_load) <= 1000, 0, ifelse(viral_load > 1000, 1, NA)))
-  ) %>%
-  filter(time_on_trt >= 0) %>%
-  dplyr::select(
-    subject_label_blinded, test_date, art_initiation_date, time_on_trt,
-    `Sedia LAg Odn screen`, sedia_ODn, viral_load, n_visits, suprressed_throughout_followup, vl_detectable
-  ) %>% # , vl_detectable, inter_test_interval
-  arrange(subject_label_blinded, test_date)
+  ungroup() #%>%
+  # mutate(
+  #   time_on_trt = as.numeric(test_date - art_initiation_date),
+  #   `Sedia LAg Odn screen` = sedia_ODn,
+  #   vl_detectable_100 = (ifelse((viral_load) <= 100, 0, ifelse(viral_load > 100, 1, NA))),
+  #   vl_detectable_400 = (ifelse((viral_load) <= 400, 0, ifelse(viral_load > 400, 1, NA))),
+  #   vl_detectable_1000 = (ifelse((viral_load) <= 1000, 0, ifelse(viral_load > 1000, 1, NA)))
+  # ) %>%
+  # filter(time_on_trt >= 0) %>%
+  # dplyr::select(
+  #   subject_label_blinded, test_date, art_initiation_date, time_on_trt,
+  #   `Sedia LAg Odn screen`, sedia_ODn, viral_load, n_visits, suprressed_throughout_followup, vl_detectable
+  # ) %>% # , vl_detectable, inter_test_interval
+  # arrange(subject_label_blinded, test_date)
 
 
 x=data_generated %>% 
