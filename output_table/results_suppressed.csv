@@ -1,0 +1,4 @@
+suppression,slope_mean_link_identity,pvalue_link_identity_slope_diff_zero,slope_mean_link_log,pvalue_link_log_slope_diff_zero
+100,-0.000207773,0.468331426,-0.000446972,0.175839893
+400,-0.000188543,0.472922445,-0.000418351,0.157608055
+1000,0.000190751,0.366109023,-1.93E-05,0.955748873
