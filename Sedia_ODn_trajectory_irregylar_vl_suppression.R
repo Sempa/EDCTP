@@ -1,5 +1,16 @@
+library(readxl)
+library(tidyverse)
+library(gtsummary)
+library(dplyr)
+library(ggplot2)
+library(minpack.lm)
+library(nlme)
+library(splines)
+library(cowplot)
 
-data_intermitent_suppression <- sedia_generic %>%
+sedia_generic <- read_csv("data/20180410-EP-LAgSedia-Generic.csv") 
+data_intermitent_suppression <- read_csv("data/20180410-EP-LAgSedia-Generic.csv") %>%
+  mutate(sedia_ODn = `result...15`) %>%
   select(
     subject_label_blinded, days_since_eddi, test_date, sedia_ODn, viral_load # , art_initiation_date, aids_diagnosis_date,
     # art_interruption_date, art_resumption_date, treatment_naive,
@@ -46,22 +57,6 @@ slopes_for_unsuppressed <- function(ODn_vl_data, threshold) {
   # browser()
   dir.create(paste("unsupp_", threshold, Sys.Date(), sep = "_"))
   folder_name <- paste("unsupp_", threshold, Sys.Date(), sep = "_")
-  # data_generated <- ODn_vl_data %>%
-  #   select(
-  #     subject_label_blinded, days_since_eddi, test_date, sedia_ODn, viral_load # , art_initiation_date, aids_diagnosis_date,
-  #     # art_interruption_date, art_resumption_date, treatment_naive,
-  #     # on_treatment, first_treatment
-  #   ) %>%
-  #   arrange(subject_label_blinded, test_date) %>%
-  #   # distinct(subject_label_blinded, test_date, .keep_all = T) %>%
-  #   filter(!is.na(viral_load)) %>%
-  #   group_by(subject_label_blinded) %>%
-  #   mutate(flagvl = ifelse(viral_load <= threshold, 0, 1)) %>%
-  #   mutate(suprressed_throughout_followup = ifelse(mean(flagvl) == 0, 1, 0)) %>%
-  #   mutate(visits = 1:length(subject_label_blinded)) %>%
-  #   mutate(n_visits = max(visits)) %>%
-  #   filter(n_visits > 1) %>%
-  #   ungroup()
 
   jpeg(paste(folder_name, "/", "Figure1", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
 
@@ -85,8 +80,7 @@ slopes_for_unsuppressed <- function(ODn_vl_data, threshold) {
         legend.position = "none"
       ) +
       ylab("Sedia LAg ODn") +
-      xlab("Time since infection (Days)") # +
-    # ggtitle(paste("Sedia ODn vs EDDI_", threshold))
+      xlab("Time since infection (Days)") 
   )
   dev.off()
 
@@ -96,24 +90,16 @@ slopes_for_unsuppressed <- function(ODn_vl_data, threshold) {
   )
   # set.seed(11)
   dat <- ODn_vl_data %>%
-    # filter(suprressed_throughout_followup == 1) %>%
-    # mutate(
-    #   sedia_ODn_with_noise = sedia_ODn + rnorm(n = length(id), mean = 0, sd = noise$coefficients[1, 1] + noise$coefficients[2, 1] * sedia_ODn),
-    #   sedia_ODn_with_noise = ifelse(sedia_ODn_with_noise < 0, 0, sedia_ODn_with_noise),
-    #   sedia_ODn_with_noise = ifelse(is.na(sedia_ODn_with_noise), sedia_ODn, sedia_ODn_with_noise)
-    # ) %>%
-    filter(!is.na(days_since_eddi)) # %>%
-  # select(id, test_date, days_since_eddi, sedia_ODn, sedia_ODn_with_noise, viral_load)
+    filter(!is.na(days_since_eddi)) 
+  
   counter <- 0
   for (i in 1:length(unique(dat$id))) {
     counter <- counter + 1
-    model_data[counter, ] <- ODn_regression_function(
+    model_data[counter, ] <- ODn_regression_function_unsupressed(
       dat = subset(dat, dat$id == unique(dat$id)[i])
     )
-    # print(i)
+    
   }
-  # browser()
-  # summary(model_data$slope_link_identity, na.rm = T)
 
   jpeg(paste(folder_name, "/", "Figure_link_identity", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
 
@@ -143,7 +129,6 @@ slopes_for_unsuppressed <- function(ODn_vl_data, threshold) {
       ggtitle(paste("histogram mean slope link=identity_", threshold))
   )
   dev.off()
-  # summary(model_data$slope_link_log, na.rm = T)
 
   jpeg(paste(folder_name, "/", "Figure_link_log", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
 
@@ -185,7 +170,7 @@ slopes_for_unsuppressed <- function(ODn_vl_data, threshold) {
   )
 }
 
-ODn_regression_function <- function(dat) {
+ODn_regression_function_unsupressed <- function(dat) {
   # browser()
   model1 <- glm(
     formula = sedia_ODn ~ days_since_eddi,
@@ -208,7 +193,15 @@ ODn_regression_function <- function(dat) {
   ))
 }
 
-
-x <- slopes_for_unsuppressed(ODn_vl_data = data_intermitent_suppression_toPeak_visits, threshold = "to_unsuppressed")
-x1 <- slopes_for_unsuppressed(ODn_vl_data = data_intermitent_suppression_totrough_visits, threshold = "from_unsuppressed")
-unsuppressed_group_slopes <- data.frame(rbind(x, x1))
+results <- c()
+type1 <- c(to_peak, to_trough)
+type2 <- c(set_to_peak, set_to_trough)
+for (i in c("to_unsuppressed", "from_unsuppressed")) {
+  x <- slopes_for_unsuppressed(ODn_vl_data = data_intermitent_suppression_selected_visits %>%
+                                            filter(!is.na(type1[i])) %>%
+                                            unite("id", c(subject_label_blinded, type2[i])), 
+                                          threshold = i
+                               )
+  results <- rbind(results, x)
+}
+write.csv(results, "output_table/results_unsuppressed.csv") # results
