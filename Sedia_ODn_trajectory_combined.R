@@ -48,7 +48,7 @@ noise <- summary(glm(sd_Sedia_ODn ~ mean_Sedia_ODn, data = sedia_distribution_bl
 
 sedia_generic <- sedia_generic %>%
   filter(visit_hivstatus == "P") %>%
-  rename(sedia_ODn = result...72) %>%
+  # rename(sedia_ODn = result...72) %>%
   filter(visit_id != 21773 & visit_id != 21783 & visit_id != 21785)
 
 ######################################################
