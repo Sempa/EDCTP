@@ -83,10 +83,10 @@ sedia_slope_data <- dat %>%
   mutate(slope_cat = ifelse(sedia_slope<= threshold, 1, 0),
          type = as.factor(flag_viralload_detectablity2))
 
-table_1 <- table(sedia_slope_data$slope_cat, sedia_slope_data$type)
+table_1 <- table(sedia_slope_data$type, sedia_slope_data$slope_cat)
 
-A <- table_1[1,2]; B <- table_1[1,1]
-C <- table_1[2,2]; D <- table_1[2,1]
+A <- table_1[2,2]; B <- table_1[2,1]
+C <- table_1[1,2]; D <- table_1[1,1]
              
 sensitivity <- A/(A+C)
 
@@ -130,10 +130,10 @@ accuracy_function <- function(dat, threshold){
     mutate(slope_cat = ifelse(sedia_slope<= threshold, 1, 0),
            type = as.factor(flag_viralload_detectablity2))
   
-  table_1 <- table(sedia_slope_data$slope_cat, sedia_slope_data$type)
+  table_1 <- table(sedia_slope_data$type, sedia_slope_data$slope_cat)
   
-  A <- table_1[1,2]; B <- table_1[1,1]
-  C <- table_1[2,2]; D <- table_1[2,1]
+  A <- table_1[2,2]; B <- table_1[2,1]
+  C <- table_1[1,2]; D <- table_1[1,1]
   
   sensitivity <- A/(A+C)
   
@@ -163,44 +163,23 @@ for (i in 1:length(threshold)) {
   accuracy_data <- rbind(accuracy_data, results)
 }
 accuracy_data
-
-# model1 <- glm(slope_cat ~ type, 
-#          data = sedia_slope_data %>%
-#            mutate(type = as.factor(flag_viralload_detectablity2)), 
-#          family = binomial())
-# threshold=0.5
-# predicted_values<-ifelse(predict(model1, type="response")>threshold,1,0)
-# actual_values<-model1$y
-# conf_matrix<-table(predicted_values,actual_values)
-# conf_matrix
-# caret::sensitivity(conf_matrix)
-
-caret::confusionMatrix(table(sedia_slope_data$slope_cat, sedia_slope_data$type))
-
-  mutate(xi= test_date - previous_date,
-         xii= next_date - test_date,
-         min_date = min(test_date)) %>%
-  mutate(flag = ifelse(xi<=10, 1, ifelse(xii<=10 , 1, 0))) %>% #& min_date!=test_date & min_date!=test_date
-  mutate(flag2 = ifelse(xi>10 & xii<=10,1,0)) %>%
-  # filter(flag == 1) %>%
-  mutate(visits = 1:length(subject_label_blinded)) %>%
-  mutate(n_visits = max(visits)) %>%
-  filter(n_visits>1) %>%
-  select(subject_label_blinded, test_date, xi, previous_date, xii, next_date, flag, flag2, sedia_ODn, viral_load, art_initiation_date, aids_diagnosis_date, 
-         art_interruption_date, art_resumption_date, treatment_naive, 
-         on_treatment, first_treatment) %>%
-  ungroup() %>%
-  mutate(y1= ifelse(xi<=10 & xi>0, 1,0),
-         y2= ifelse(xii<=10 & xii>0, 1,0)) %>%
-  select(subject_label_blinded, test_date, xi, previous_date, xii, next_date, flag, flag2, sedia_ODn, viral_load, y1, y2) %>%
-  filter(y1==1 | y2==1) %>%
-  group_by(subject_label_blinded) %>%
-  mutate(inter_test_interval = c(0, diff(test_date)),
-         previous_date = test_date- inter_test_interval
+write.csv(accuracy_data, 'output_table/accuracy_data.csv')
+######################################################
+#' Comparing the differences between Sedia LAg ODn visits
+######################################################
+sedia_diffs_data_sorting <- data_sorting %>%
+  filter(suprressed_throughout_followup_1000 == 1 | to_peak == 1 | to_trough == 1
   ) %>%
-  mutate(inter_test_interval = c(diff(test_date),0),
-         next_date = test_date+ inter_test_interval
-  ) %>%
-  mutate(xi= test_date - previous_date,
-         xii= next_date - test_date,
-         min_date = min(test_date))
+  filter(!is.na(sedia_slope)) %>%
+  mutate(sedia_diff = sedia_ODn - sedia_ODn_2)
+
+t.test((sedia_diffs_data_sorting %>%
+          filter(suprressed_throughout_followup_100 == 1))$sedia_diff)
+t.test((sedia_diffs_data_sorting %>%
+          filter(suprressed_throughout_followup_400 == 1))$sedia_diff)
+t.test((sedia_diffs_data_sorting %>%
+          filter(suprressed_throughout_followup_1000 == 1))$sedia_diff)
+t.test((sedia_diffs_data_sorting %>%
+         filter(to_peak == 1))$sedia_diff)
+t.test((sedia_diffs_data_sorting %>%
+         filter(to_trough == 1))$sedia_diff)
