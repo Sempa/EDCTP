@@ -165,7 +165,7 @@ for (i in 1:length(threshold)) {
 accuracy_data
 write.csv(accuracy_data, 'output_table/accuracy_data.csv')
 ######################################################
-#' Comparing the differences between Sedia LAg ODn visits
+#' The differences between Sedia LAg ODn visits
 ######################################################
 sedia_diffs_data_sorting <- data_sorting %>%
   filter(suprressed_throughout_followup_1000 == 1 | to_peak == 1 | to_trough == 1
@@ -183,3 +183,54 @@ t.test((sedia_diffs_data_sorting %>%
          filter(to_peak == 1))$sedia_diff)
 t.test((sedia_diffs_data_sorting %>%
          filter(to_trough == 1))$sedia_diff)
+
+dat <- sedia_diffs_data_sorting %>%
+  filter(suprressed_throughout_followup_100 == 1)
+  set.seed(11)
+  x <- rnorm(5e3, mean = mean(dat$sedia_diff), sd = 3 * sd(dat$sedia_diff))
+  dx <- density(x)
+  jpeg('other_figures/Figure_less_100.jpeg', units = "in", width = 8, height = 6, res = 300)
+  hist(dat$sedia_diff, breaks = 30, freq = FALSE, main = "Distribution of Sedia differences_less 100")
+  lines(dx, lwd = 2, col = "red")
+  dev.off()
+  
+dat <- sedia_diffs_data_sorting %>%
+  filter(suprressed_throughout_followup_400 == 1)
+  set.seed(11)
+  x <- rnorm(5e3, mean = mean(dat$sedia_diff), sd = 3 * sd(dat$sedia_diff))
+  dx <- density(x)
+  jpeg('other_figures/Figure_less_400.jpeg', units = "in", width = 8, height = 6, res = 300)
+  hist(dat$sedia_diff, breaks = 30, freq = FALSE, main = "Distribution of Sedia differences_less 400")
+  lines(dx, lwd = 2, col = "red")
+  dev.off()
+  
+dat <- sedia_diffs_data_sorting %>%
+  filter(suprressed_throughout_followup_1000 == 1)
+  set.seed(11)
+  x <- rnorm(5e3, mean = mean(dat$sedia_diff), sd = 3 * sd(dat$sedia_diff))
+  dx <- density(x)
+  jpeg('other_figures/Figure_less_1000.jpeg', units = "in", width = 8, height = 6, res = 300)
+  hist(dat$sedia_diff, breaks = 30, freq = FALSE, main = "Distribution of Sedia differences_less 1e3")
+  lines(dx, lwd = 2, col = "red")
+  dev.off()
+  
+dat <- sedia_diffs_data_sorting %>%
+  filter(to_peak == 1)
+  set.seed(11)
+  x <- rnorm(5e3, mean = mean(dat$sedia_diff), sd = 3 * sd(dat$sedia_diff))
+  dx <- density(x)
+  jpeg('other_figures/Figure_to_peak.jpeg', units = "in", width = 8, height = 6, res = 300)
+  hist(dat$sedia_diff, breaks = 30, freq = FALSE, main = "Distribution of Sedia differences_to peak")
+  lines(dx, lwd = 2, col = "red")
+  dev.off()
+  
+dat <- sedia_diffs_data_sorting %>%
+  filter(to_trough == 1)
+  set.seed(11)
+  x <- rnorm(5e3, mean = mean(dat$sedia_diff), sd = 3 * sd(dat$sedia_diff))
+  dx <- density(x)
+  jpeg('other_figures/Figure_to_trough.jpeg', units = "in", width = 8, height = 6, res = 300)
+  hist(dat$sedia_diff, breaks = 30, freq = FALSE, main = "Distribution of Sedia differences_to trough")
+  lines(dx, lwd = 2, col = "red")
+  dev.off()
+  

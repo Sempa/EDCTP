@@ -126,62 +126,75 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
     # print(i)
   }
   # summary(model_data$slope_link_identity, na.rm = T)
-
+  # browser()
+  set.seed(11)
+  x <- rnorm(5e3, mean = mean(model_data$slope_link_identity, na.rm = T), sd = 3*sd(model_data$slope_link_identity))
+  dx <- density(x)
   jpeg(paste(folder_name, "/", "Figure_link_identity", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
-
-  print(
-    model_data %>%
-      ggplot(aes(x = slope_link_identity)) +
-      geom_histogram(color = "#e9ecef", alpha = 0.6, bins = 30, position = "identity") +
-      scale_fill_manual(values = c("#69b3a2", "#404080")) +
-      labs(fill = "") +
-      geom_density(
-        lwd = 1.2,
-        linetype = 1,
-        colour = 2
-      ) +
-      theme(
-        text = element_text(size = 20),
-        plot.title = element_text(hjust = 0.5),
-        axis.line = element_line(colour = "black"),
-        axis.text = element_text(size = 18),
-        axis.title = element_text(size = 18),
-        panel.background = element_blank(),
-        panel.border = element_blank(),
-        plot.margin = unit(c(0, 0, 0, 0), "null"),
-        legend.position = "none"
-      ) +
-      ggtitle(paste("histogram mean slope link=identity_", threshold))
-  )
+  
+  hist(model_data$slope_link_identity, breaks = 30, freq = FALSE, main = paste("Mean slope link=identity_", threshold))
+  lines(dx, lwd = 2, col = "red")
+  
+  # print(
+    # model_data %>%
+    #   ggplot(aes(x = slope_link_identity)) +
+    #   geom_histogram(color = "#e9ecef", alpha = 0.6, bins = 30, position = "identity") +
+    #   scale_fill_manual(values = c("#69b3a2", "#404080")) +
+    #   labs(fill = "") +
+    #   geom_density(
+    #     lwd = 1.2,
+    #     linetype = 1,
+    #     colour = 2
+    #   ) +
+    #   theme(
+    #     text = element_text(size = 20),
+    #     plot.title = element_text(hjust = 0.5),
+    #     axis.line = element_line(colour = "black"),
+    #     axis.text = element_text(size = 18),
+    #     axis.title = element_text(size = 18),
+    #     panel.background = element_blank(),
+    #     panel.border = element_blank(),
+    #     plot.margin = unit(c(0, 0, 0, 0), "null"),
+    #     legend.position = "none"
+    #   ) +
+    #   ggtitle(paste("histogram mean slope link=identity_", threshold))
+    
+  # )
   dev.off()
   # summary(model_data$slope_link_log, na.rm = T)
-
+  set.seed(11)
+  x <- rnorm(5e3, mean = mean(model_data$slope_link_log, na.rm = T), sd = 3*sd(model_data$slope_link_log))
+  dx <- density(x)
+  
   jpeg(paste(folder_name, "/", "Figure_link_log", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
-
-  print(
-    model_data %>%
-      ggplot(aes(x = slope_link_log)) +
-      geom_histogram(color = "#e9ecef", alpha = 0.6, bins = 30, position = "identity") +
-      scale_fill_manual(values = c("#69b3a2", "#404080")) +
-      labs(fill = "") +
-      geom_density(
-        lwd = 1.2,
-        linetype = 1,
-        colour = 2
-      ) +
-      theme(
-        text = element_text(size = 20),
-        plot.title = element_text(hjust = 0.5),
-        axis.line = element_line(colour = "black"),
-        axis.text = element_text(size = 18),
-        axis.title = element_text(size = 18),
-        panel.background = element_blank(),
-        panel.border = element_blank(),
-        plot.margin = unit(c(0, 0, 0, 0), "null"),
-        legend.position = "none"
-      ) +
-      ggtitle(paste("histogram mean slope link=log_", threshold))
-  )
+  
+  hist(model_data$slope_link_log, breaks = 30, freq = FALSE, main = paste("Mean slope link=log_", threshold))
+  lines(dx, lwd = 2, col = "red")
+  
+  # print(
+  #   model_data %>%
+  #     ggplot(aes(x = slope_link_log)) +
+  #     geom_histogram(color = "#e9ecef", alpha = 0.6, bins = 30, position = "identity") +
+  #     scale_fill_manual(values = c("#69b3a2", "#404080")) +
+  #     labs(fill = "") +
+  #     geom_density(
+  #       lwd = 1.2,
+  #       linetype = 1,
+  #       colour = 2
+  #     ) +
+  #     theme(
+  #       text = element_text(size = 20),
+  #       plot.title = element_text(hjust = 0.5),
+  #       axis.line = element_line(colour = "black"),
+  #       axis.text = element_text(size = 18),
+  #       axis.title = element_text(size = 18),
+  #       panel.background = element_blank(),
+  #       panel.border = element_blank(),
+  #       plot.margin = unit(c(0, 0, 0, 0), "null"),
+  #       legend.position = "none"
+  #     ) +
+  #     ggtitle(paste("histogram mean slope link=log_", threshold))
+  # )
   dev.off()
 
   return(
@@ -320,63 +333,81 @@ slopes_for_unsuppressed <- function(ODn_vl_data, threshold) {
       dat = subset(dat, dat$id == unique(dat$id)[i])
     )
   }
-
+# browser()
+  model_data <- model_data %>%
+    mutate(`slope link identity` = as.numeric(slope_link_identity),
+           `slope link log` = as.numeric(slope_link_log))
+  set.seed(11)
+  x <- rnorm(5e3, mean = mean(model_data$`slope link identity`, na.rm = T), sd = 3*sd(model_data$`slope link identity`))
+  dx <- density(x)
+  
   jpeg(paste(folder_name, "/", "Figure_link_identity", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
-
-  print(
-    model_data %>%
-      mutate(slope_link_identity = as.numeric(slope_link_identity)) %>%
-      ggplot(aes(x = slope_link_identity)) +
-      geom_histogram(color = "#e9ecef", alpha = 0.6, bins = 30, position = "identity") +
-      scale_fill_manual(values = c("#69b3a2", "#404080")) +
-      labs(fill = "") +
-      geom_density(
-        lwd = 1.2,
-        linetype = 1,
-        colour = 2
-      ) +
-      theme(
-        text = element_text(size = 20),
-        plot.title = element_text(hjust = 0.5),
-        axis.line = element_line(colour = "black"),
-        axis.text = element_text(size = 18),
-        axis.title = element_text(size = 18),
-        panel.background = element_blank(),
-        panel.border = element_blank(),
-        plot.margin = unit(c(0, 0, 0, 0), "null"),
-        legend.position = "none"
-      ) +
-      ggtitle(paste("histogram mean slope link=identity_", threshold))
-  )
+  
+  hist(model_data$`slope link identity`, breaks = 30, freq = FALSE, main = paste("Mean slope link=identity_", threshold))
+  lines(dx, lwd = 2, col = "red")
+  
+  # print(
+  #   model_data %>%
+  #     mutate(slope_link_identity = as.numeric(slope_link_identity)) %>%
+  #     ggplot(aes(x = slope_link_identity)) +
+  #     geom_histogram(color = "#e9ecef", alpha = 0.6, bins = 30, position = "identity") +
+  #     scale_fill_manual(values = c("#69b3a2", "#404080")) +
+  #     labs(fill = "") +
+  #     geom_density(
+  #       lwd = 1.2,
+  #       linetype = 1,
+  #       colour = 2
+  #     ) +
+  #     theme(
+  #       text = element_text(size = 20),
+  #       plot.title = element_text(hjust = 0.5),
+  #       axis.line = element_line(colour = "black"),
+  #       axis.text = element_text(size = 18),
+  #       axis.title = element_text(size = 18),
+  #       panel.background = element_blank(),
+  #       panel.border = element_blank(),
+  #       plot.margin = unit(c(0, 0, 0, 0), "null"),
+  #       legend.position = "none"
+  #     ) +
+  #     ggtitle(paste("histogram mean slope link=identity_", threshold))
+  # )
   dev.off()
-
-  jpeg(paste(folder_name, "/", "Figure_link_log", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
-
-  print(
-    model_data %>%
-      mutate(slope_link_log = as.numeric(slope_link_log)) %>%
-      ggplot(aes(x = slope_link_log)) +
-      geom_histogram(color = "#e9ecef", alpha = 0.6, bins = 30, position = "identity") +
-      scale_fill_manual(values = c("#69b3a2", "#404080")) +
-      labs(fill = "") +
-      geom_density(
-        lwd = 1.2,
-        linetype = 1,
-        colour = 2
-      ) +
-      theme(
-        text = element_text(size = 20),
-        plot.title = element_text(hjust = 0.5),
-        axis.line = element_line(colour = "black"),
-        axis.text = element_text(size = 18),
-        axis.title = element_text(size = 18),
-        panel.background = element_blank(),
-        panel.border = element_blank(),
-        plot.margin = unit(c(0, 0, 0, 0), "null"),
-        legend.position = "none"
-      ) +
-      ggtitle(paste("histogram mean slope link=log_", threshold))
-  )
+  
+  set.seed(11)
+  x <- rnorm(5e3, mean = mean(model_data$`slope link log`, na.rm = T), sd = 3*sd(model_data$`slope link log`))
+  dx <- density(x)
+  
+  
+  jpeg(paste(folder_name, "/", "Figure_link_log",threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
+  
+  hist(model_data$`slope link log`, breaks = 30, freq = FALSE, main = paste("Mean slope link=log_", threshold))
+  lines(dx, lwd = 2, col = "red")
+  
+  # print(
+  #   model_data %>%
+  #     mutate(slope_link_log = as.numeric(slope_link_log)) %>%
+  #     ggplot(aes(x = slope_link_log)) +
+  #     geom_histogram(color = "#e9ecef", alpha = 0.6, bins = 30, position = "identity") +
+  #     scale_fill_manual(values = c("#69b3a2", "#404080")) +
+  #     labs(fill = "") +
+  #     geom_density(
+  #       lwd = 1.2,
+  #       linetype = 1,
+  #       colour = 2
+  #     ) +
+  #     theme(
+  #       text = element_text(size = 20),
+  #       plot.title = element_text(hjust = 0.5),
+  #       axis.line = element_line(colour = "black"),
+  #       axis.text = element_text(size = 18),
+  #       axis.title = element_text(size = 18),
+  #       panel.background = element_blank(),
+  #       panel.border = element_blank(),
+  #       plot.margin = unit(c(0, 0, 0, 0), "null"),
+  #       legend.position = "none"
+  #     ) +
+  #     ggtitle(paste("histogram mean slope link=log_", threshold))
+  # )
   dev.off()
 
   return(
