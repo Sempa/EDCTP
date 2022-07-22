@@ -7,6 +7,7 @@ library(minpack.lm)
 library(nlme)
 library(splines)
 library(cowplot)
+library(distributions3)
 
 # source('estimate_measurement_noise_dist.R')
 #############################################
@@ -128,7 +129,7 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
   # summary(model_data$slope_link_identity, na.rm = T)
   # browser()
   set.seed(11)
-  x <- rnorm(5e3, mean = mean(model_data$slope_link_identity, na.rm = T), sd = 3*sd(model_data$slope_link_identity))
+  x <- rnorm(5e3, mean = mean(model_data$slope_link_identity, na.rm = T), sd = sd(model_data$slope_link_identity))
   dx <- density(x)
   jpeg(paste(folder_name, "/", "Figure_link_identity", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
   
@@ -163,7 +164,7 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
   dev.off()
   # summary(model_data$slope_link_log, na.rm = T)
   set.seed(11)
-  x <- rnorm(5e3, mean = mean(model_data$slope_link_log, na.rm = T), sd = 3*sd(model_data$slope_link_log))
+  x <- rnorm(5e3, mean = mean(model_data$slope_link_log, na.rm = T), sd = sd(model_data$slope_link_log))
   dx <- density(x)
   
   jpeg(paste(folder_name, "/", "Figure_link_log", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
@@ -459,3 +460,22 @@ x_to_tough <- slopes_for_unsuppressed(
 results_unsuppressed <- rbind(x_to_peak, x_to_tough)
 
 write.csv(results_unsuppressed, "output_table/results_unsuppressed.csv")
+
+
+#####################################
+#'compare value with historic mean
+####################################
+
+v <- c(1,2,3,4,5)
+for (i in 1:length(v)) {
+  s= v[i]
+  remaining_values <- v[!(v%in% s)]
+  avg = mean(remaining_values)
+  z_stat <- (avg - s) / (2 / sqrt(length(remaining_values)))
+  # z_stat
+  set.seed(11)
+  Z <- Normal(0, 1)  # make a standard normal r.v.
+  p_value <- 1 - cdf(Z, abs(z_stat)) + cdf(Z, -abs(z_stat))
+  print(avg);print(s);print(z_stat);print(p_value)
+}
+
