@@ -466,16 +466,92 @@ write.csv(results_unsuppressed, "output_table/results_unsuppressed.csv")
 #'compare value with historic mean
 ####################################
 
-v <- c(1,2,3,4,5)
-for (i in 1:length(v)) {
-  s= v[i]
-  remaining_values <- v[!(v%in% s)]
-  avg = mean(remaining_values)
-  z_stat <- (avg - s) / (2 / sqrt(length(remaining_values)))
-  # z_stat
+data_generated <- sedia_generic %>%
+  select(
+    subject_label_blinded, days_since_eddi, test_date, sedia_ODn, viral_load # , art_initiation_date, aids_diagnosis_date,
+    # art_interruption_date, art_resumption_date, treatment_naive,
+    # on_treatment, first_treatment
+  ) %>%
+  arrange(subject_label_blinded, test_date) %>%
+  # distinct(subject_label_blinded, test_date, .keep_all = T) %>%
+  filter(!is.na(viral_load)) %>%
+  group_by(subject_label_blinded) %>%
+  mutate(flagvl = ifelse(viral_load <= 100, 0, 1)) %>%
+  mutate(suprressed_throughout_followup = ifelse(mean(flagvl) == 0, 1, 0)) %>%
+  mutate(visits = 1:length(subject_label_blinded)) %>%
+  mutate(n_visits = max(visits)) %>%
+  filter(n_visits > 2) %>% # because at this stage we want to compare a with the group average
+  ungroup() %>%
+  filter(suprressed_throughout_followup==1) %>%
+  mutate(id = as.character(subject_label_blinded)) %>%
+  dplyr::select(id, subject_label_blinded, sedia_ODn)
+
+p_Value_z_test <- function(list_values, test_value){
+  # browser()
+  avg = mean(list_values)
+  z_stat <- (avg - test_value) / (sd(list_values) / sqrt(length(list_values)))
+  # print(z_stat)
   set.seed(11)
   Z <- Normal(0, 1)  # make a standard normal r.v.
   p_value <- 1 - cdf(Z, abs(z_stat)) + cdf(Z, -abs(z_stat))
-  print(avg);print(s);print(z_stat);print(p_value)
+  # print(list_value); print(avg): print(z_stat): print(p_value)
+  return(cbind(z_stat, p_value))
 }
 
+results1 <- data.frame(id = 'NA', value = NA, avg = NA, z_stat = NA, p_value = NA)
+# number_ids <- length(unique(data_generated$subject_label_blinded))
+ids <- unique(data_generated$id)
+for (i in 1:length(ids)) {
+  # browser()
+  ODn_values <- (data_generated %>%
+                # mutate(id = as.character(subject_label_blinded)) %>%
+                filter(id == ids[i])# %>%number_ids[i]
+                # dplyr::select(sedia_ODn)
+              )$sedia_ODn
+
+  for (j in 1:length(ODn_values)) {
+   test_value = ODn_values[j]
+  list_values <- ODn_values[!(ODn_values%in% test_value)]
+  z_test <- p_Value_z_test (list_values = list_values, test_value = test_value)
+  # print(avg);print(s);print(z_stat);print(p_value)
+  # browser()
+  results1[j,] <- cbind(id = ids[i], value = test_value, avg = mean(list_values),
+                        z_stat = z_test[[1]], p_value = z_test[[2]]) 
+  }
+  # print(results1)
+}
+
+
+results1
+
+#########################################################################################
+#'Extra code
+#'#######################################################################################
+
+
+
+v <- c(1,2,3,4,5)
+results1 <- data.frame(value = NA, z_stat = NA, p_value = NA)
+for (i in 1:length(v)) {
+  test_value = v[i]
+  list_values <- v[!(v%in% test_value)]
+  z_test <- p_Value_z_test (list_values = list_values, test_value = test_value)
+  # print(avg);print(s);print(z_stat);print(p_value)
+  results1[i,] <- cbind(value = test_value, 
+                        z_stat = z_test[[1]], p_value = z_test[[2]])
+}
+
+v <- c(3,5,7,3,10,6)
+last_value_in_vec <- v[length(v)] # g <- 6
+new_vector <- v[!(v %in%last_value_in_vec)]
+results <- data.frame(n = NA, last_value = NA, z_stat = NA, p_value = NA)
+for (i in 1:(length(new_vector)-1)) {
+  # browser()
+  x <- length(new_vector)
+  y <- length(new_vector)- i
+  list_value <- new_vector[x:y]
+  z_test <- p_Value_z_test(list_values = list_value, test_value = last_value_in_vec)
+  results[i,] <- cbind(n = length(list_value), last_value = last_value_in_vec, 
+                       z_stat = z_test[[1]], p_value = z_test[[2]])
+}
+results
