@@ -465,27 +465,6 @@ write.csv(results_unsuppressed, "output_table/results_unsuppressed.csv")
 #####################################
 #'compare value with historic mean
 ####################################
-
-data_generated <- sedia_generic %>%
-  select(
-    subject_label_blinded, days_since_eddi, test_date, sedia_ODn, viral_load # , art_initiation_date, aids_diagnosis_date,
-    # art_interruption_date, art_resumption_date, treatment_naive,
-    # on_treatment, first_treatment
-  ) %>%
-  arrange(subject_label_blinded, test_date) %>%
-  # distinct(subject_label_blinded, test_date, .keep_all = T) %>%
-  filter(!is.na(viral_load)) %>%
-  group_by(subject_label_blinded) %>%
-  mutate(flagvl = ifelse(viral_load <= 100, 0, 1)) %>%
-  mutate(suprressed_throughout_followup = ifelse(mean(flagvl) == 0, 1, 0)) %>%
-  mutate(visits = 1:length(subject_label_blinded)) %>%
-  mutate(n_visits = max(visits)) %>%
-  filter(n_visits > 2) %>% # because at this stage we want to compare a with the group average
-  ungroup() %>%
-  filter(suprressed_throughout_followup==1) %>%
-  mutate(id = as.character(subject_label_blinded)) %>%
-  dplyr::select(id, subject_label_blinded, sedia_ODn)
-
 p_Value_z_test <- function(list_values, test_value){
   # browser()
   avg = mean(list_values)
@@ -498,32 +477,91 @@ p_Value_z_test <- function(list_values, test_value){
   return(cbind(z_stat, p_value))
 }
 
-results1 <- data.frame(id = 'NA', value = NA, avg = NA, z_stat = NA, p_value = NA)
-# number_ids <- length(unique(data_generated$subject_label_blinded))
-ids <- unique(data_generated$id)
-for (i in 1:length(ids)) {
-  # browser()
-  ODn_values <- (data_generated %>%
-                # mutate(id = as.character(subject_label_blinded)) %>%
-                filter(id == ids[i])# %>%number_ids[i]
-                # dplyr::select(sedia_ODn)
-              )$sedia_ODn
+compare_value_with_others <- function(data_set, threshold) {
+  data_generated <- data_set %>%
+    select(
+      subject_label_blinded, days_since_eddi, test_date, sedia_ODn, viral_load # , art_initiation_date, aids_diagnosis_date,
+      # art_interruption_date, art_resumption_date, treatment_naive,
+      # on_treatment, first_treatment
+    ) %>%
+    arrange(subject_label_blinded, test_date) %>%
+    # distinct(subject_label_blinded, test_date, .keep_all = T) %>%
+    filter(!is.na(viral_load)) %>%
+    group_by(subject_label_blinded) %>%
+    mutate(flagvl = ifelse(viral_load <= threshold, 0, 1)) %>%
+    mutate(suprressed_throughout_followup = ifelse(mean(flagvl) == 0, 1, 0)) %>%
+    mutate(visits = 1:length(subject_label_blinded)) %>%
+    mutate(n_visits = max(visits)) %>%
+    filter(n_visits > 2) %>% # because at this stage we want to compare a with the group average
+    ungroup() %>%
+    filter(suprressed_throughout_followup == 1) %>%
+    mutate(id = as.character(subject_label_blinded)) %>%
+    dplyr::select(id, subject_label_blinded, sedia_ODn)
 
-  for (j in 1:length(ODn_values)) {
-   test_value = ODn_values[j]
-  list_values <- ODn_values[!(ODn_values%in% test_value)]
-  z_test <- p_Value_z_test (list_values = list_values, test_value = test_value)
-  # print(avg);print(s);print(z_stat);print(p_value)
-  # browser()
-  results1[j,] <- cbind(id = ids[i], value = test_value, avg = mean(list_values),
-                        z_stat = z_test[[1]], p_value = z_test[[2]]) 
+  results1 <- c() 
+  ids <- unique(data_generated$id)
+  for (i in 1:length(ids)) {
+    ODn_values <- (data_generated %>%
+      filter(id == ids[i]) # %>%number_ids[i]
+    )$sedia_ODn
+    results_by_id <- c()
+    for (j in 1:length(ODn_values)) {
+      test_value <- ODn_values[j]
+      list_values <- ODn_values[!(ODn_values %in% test_value)]
+      z_test <- p_Value_z_test(list_values = list_values, test_value = test_value)
+      results_by_id <- rbind(results_by_id, cbind(id = ids[i],value = test_value, z_test)) # value = test_value,
+    }
+    results1 <- rbind(results1, results_by_id)
   }
-  # print(results1)
+
+  return(cbind(results1, threshold = threshold))
 }
 
+results_suppressed <- c()
+for (i in c(100, 400, 1000)) {
+  # results1 <- c()
+  results_suppressed <- rbind(results_suppressed, compare_value_with_others(data_set = sedia_generic, threshold = i))
+  
+}
+results_suppressed <- as_tibble(results_suppressed) %>%
+  distinct(id,z_stat, p_value, .keep_all = T) %>%
+  mutate(significance = ifelse(as.numeric(p_value) < 0.05, TRUE, FALSE))
 
-results1
 
+compare_lastvalue_with_previous <- function(data_set) {
+  # browser()
+  data_generated <- data_set %>% # data_intermitent_suppression_selected_visits
+    filter(all_visits_to_peak == 1) %>%
+    mutate(id = as.character(subject_label_blinded)) %>%
+    dplyr::select(id, days_since_eddi, test_date, sedia_ODn, viral_load, to_peak, all_visits_to_peak)
+
+  results1 <- c()
+  ids <- unique(data_generated$id)
+  for (i in 1:length(ids)) {
+    ODn_values <- (data_generated %>%
+      filter(id == ids[i])
+    )$sedia_ODn
+    results_by_id <- c()
+    last_value_in_vec <- ODn_values[length(ODn_values)] # g <- 6
+    new_vector <- ODn_values[!(ODn_values %in% last_value_in_vec)]
+    # browser()
+    for (j in 1:(length(new_vector) - 1)) {
+      x <- length(new_vector)
+      y <- length(new_vector) - j
+      list_values <- new_vector[x:y]
+      test_value <- last_value_in_vec # ODn_values[j]
+      # list_values <- ODn_values[!(ODn_values %in% test_value)]
+      z_test <- p_Value_z_test(list_values = list_values, test_value = test_value)
+      results_by_id <- rbind(results_by_id, cbind(id = ids[i], value = test_value, z_test)) # value = test_value,
+    }
+    # print(ids[i])
+    results1 <- rbind(results1, results_by_id)
+  }
+  return(results1)
+}
+
+compare_first_peak_value <- as_tibble(compare_lastvalue_with_previous(data_set = data_intermitent_suppression_selected_visits)) %>%
+  mutate(significance = ifelse(as.numeric(p_value) < 0.05, TRUE, FALSE))
 #########################################################################################
 #'Extra code
 #'#######################################################################################
