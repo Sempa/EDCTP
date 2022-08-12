@@ -268,7 +268,8 @@ data_intermitent_suppression <- read_csv("data/20180410-EP-LAgSedia-Generic.csv"
 #' does the slope for ODn among those with ODn<2 differ from those with ODn>2 in
 #' patients peaking?
 write.csv(data_intermitent_suppression, "output_table/intermitent_suppression.csv")
-data_intermitent_suppression_selected_visits <- read.csv("output_table/intermitent_suppression_selected.csv")
+data_intermitent_suppression_selected_visits <- read.csv("output_table/intermitent_suppression_selected.csv") %>%
+  mutate(all_visits_to_peak = ifelse(subject_label_blinded == 28848447, NA, all_visits_to_peak))
 data_intermitent_suppression_toPeak_visits <- data_intermitent_suppression_selected_visits %>%
   filter(!is.na(to_peak)) %>%
   unite("id", c(subject_label_blinded, set_to_peak))
@@ -464,7 +465,8 @@ write.csv(results_unsuppressed, "output_table/results_unsuppressed.csv")
 #########################################################################################
 #'Using pooled standard deveiation
 #'#######################################################################################
-compare_value_with_others <- function(data_set, threshold) {
+
+sigma_ODn_func <- function(data_set, threshold){
   data_generated <- data_set %>%
     select(
       subject_label_blinded, days_since_eddi, test_date, sedia_ODn, viral_load # , art_initiation_date, aids_diagnosis_date,
@@ -479,7 +481,39 @@ compare_value_with_others <- function(data_set, threshold) {
     mutate(suprressed_throughout_followup = ifelse(mean(flagvl) == 0, 1, 0)) %>%
     mutate(visits = 1:length(subject_label_blinded)) %>%
     mutate(n_visits = max(visits)) %>%
-    filter(n_visits > 2) %>% # because at this stage we want to compare a with the group average
+    filter(n_visits > 1) %>% # because at this stage we want to compare a with the group average
+    ungroup() %>%
+    filter(suprressed_throughout_followup == 1) %>%
+    mutate(id = as.character(subject_label_blinded)) %>%
+    dplyr::select(id, subject_label_blinded, sedia_ODn)%>%
+    group_by(id) %>%
+    summarise(n_length = n(),
+              sd_value = sd(sedia_ODn))%>%
+    mutate(numerator = ((n_length-1) * sd_value^2))
+  g_stddev <- sum(data_generated$numerator)
+  n_samples <- sum(data_generated$n_length)
+  sigma_ODn <- (g_stddev / (n_samples-length(data_generated$n_length)))^.5
+  
+  return(sigma_ODn)
+}
+# sigma_ODn_func(sedia_generic, threshold = 1000)
+
+compare_value_with_others <- function(data_set, threshold, sigma_ODn) {
+  data_generated <- data_set %>%
+    select(
+      subject_label_blinded, days_since_eddi, test_date, sedia_ODn, viral_load # , art_initiation_date, aids_diagnosis_date,
+      # art_interruption_date, art_resumption_date, treatment_naive,
+      # on_treatment, first_treatment
+    ) %>%
+    arrange(subject_label_blinded, test_date) %>%
+    # distinct(subject_label_blinded, test_date, .keep_all = T) %>%
+    filter(!is.na(viral_load)) %>%
+    group_by(subject_label_blinded) %>%
+    mutate(flagvl = ifelse(viral_load <= threshold, 0, 1)) %>%
+    mutate(suprressed_throughout_followup = ifelse(mean(flagvl) == 0, 1, 0)) %>%
+    mutate(visits = 1:length(subject_label_blinded)) %>%
+    mutate(n_visits = max(visits)) %>%
+    filter(n_visits > 1) %>% # because at this stage we want to compare a with the group average
     ungroup() %>%
     filter(suprressed_throughout_followup == 1) %>%
     mutate(id = as.character(subject_label_blinded)) %>%
@@ -489,36 +523,19 @@ compare_value_with_others <- function(data_set, threshold) {
   ids <- unique(data_generated$id)
   # browser()
   for (i in 1:length(ids)) {
-    ODn_values <- (data_generated %>%
+    ODn_values1 <- (data_generated %>%
                      filter(id == ids[i]) # %>%number_ids[i]
     )$sedia_ODn
-    # browser()
-    results2 <- c()
-    id_list  <- ids[!(ids%in%ids[i])]
-    for (k in 1:length(id_list)) {
-      ODn_values <- (data_generated %>%
-                       filter(id == id_list[k]) # %>%number_ids[i]
-      )$sedia_ODn
-      sd_value   <- sd(ODn_values)
-      n_length <- length(ODn_values)
-      results2 <- rbind(results2, cbind(sd_va =sd_value, n_lgth = n_length))
-    }
-    # browser()
-    results2 <- data.frame(results2) %>%
-      mutate(numerator = ((n_lgth - 1) * sd_va^2))
-    g_stddev <- sum(results2$numerator)
-    n_samples <- sum(results2$n_lgth)
     results_by_id <- c()
-    for (j in 1:length(ODn_values)) {
-      test_value <- ODn_values[j]
-      list_values <- ODn_values[!(ODn_values %in% test_value)]
+    for (j in 1:length(ODn_values1)) {
+      test_value <- ODn_values1[j]
+      list_values <- ODn_values1[!(ODn_values1 %in% test_value)]
       # z_test <- p_Value_z_test(list_values = list_values, test_value = test_value)
       length_list_value <- length(list_values)
-      sd_primary_set <- sd(list_values)
-      avg_list_values <- mean(list_values)
-      # browser()
-      p_sd <- ((length(list_values)-1)*sd_primary_set^2 + g_stddev)/((n_samples + length_list_value)-(length(ids)-1))
-      z_test <- (avg_list_values - test_value)/p_sd
+      sigma_mu_s <- sigma_ODn / length_list_value^.5 #sd(list_values)
+      mu_s <- mean(list_values)
+      sigma_Y <- (sigma_mu_s^2  +  sigma_ODn^2)^.5#((((length(list_values) - 1) * sd_primary_set^2) + g_stddev) / ((n_samples + length_list_value) - (length(ids) - 1)))^.5
+      z_test <- (test_value - mu_s) / sigma_Y
       set.seed(11)
       Z <- Normal(0, 1)  # make a standard normal r.v.
       p_value <- 1 - cdf(Z, abs(z_test)) + cdf(Z, -abs(z_test))
@@ -531,67 +548,76 @@ compare_value_with_others <- function(data_set, threshold) {
 }
 
 results_suppressed <- c()
-for (i in c(100, 400, 1000)) {
+for (i in c(100, 400,1000)) {# 
   # results1 <- c()
-  results_suppressed <- rbind(results_suppressed, compare_value_with_others(data_set = sedia_generic, threshold = i))
+  results_suppressed <- rbind(results_suppressed, compare_value_with_others(data_set = sedia_generic, threshold = i,
+                              sigma_ODn = sigma_ODn_func(sedia_generic, threshold = 1000)))
   
 }
+
+##14660337, 22432139, 69689704,83908543, 99138302
+
 results_suppressed1 <- as_tibble(results_suppressed) %>%
   distinct(id,z_stat, p_value, .keep_all = T) %>%
-  mutate(significance = ifelse(as.numeric(p_value) < 0.05, TRUE, FALSE))
+  # filter(threshold==1000) %>%
+  mutate(significance = ifelse(as.numeric(p_value) < 0.05, TRUE, FALSE),
+         `P-value` = as.numeric(p_value))
 
 table(results_suppressed1$significance)
+# hist(as.numeric(results_suppressed1$p_value), breaks = 50)
 
+graph_results_suppressed1<-ggplot(results_suppressed1, aes(x=`P-value`)) +
+  geom_histogram(color="black", fill="red", position="dodge")+
+  geom_vline( aes(xintercept=0.05),
+             linetype="dashed", size = 1.5)+
+  theme(
+          text = element_text(size = 20),
+          plot.title = element_text(hjust = 0.5),
+          axis.line = element_line(colour = "black"),
+          axis.text = element_text(size = 18),
+          axis.title = element_text(size = 18),
+          panel.background = element_blank(),
+          panel.border = element_blank(),
+          plot.margin = unit(c(0, 0, 0, 0), "null"),
+          legend.position = "none"
+        )
+# graph_results_suppressed1
+jpeg('other_figures/compare_value_with_others.jpeg', units = "in", width = 8, height = 6, res = 300)
+graph_results_suppressed1
+dev.off()
 #' Compare the first LAg visit with VL > 1000 copies, with averages (backward moving averages) of the previous readings 
-compare_lastvalue_with_previous <- function(data_set) {
+compare_lastvalue_with_previous <- function(data_set, sigma_ODn) {
   # browser()
   data_generated <- data_set %>% # data_intermitent_suppression_selected_visits
     filter(all_visits_to_peak == 1) %>%
     mutate(id = as.character(subject_label_blinded)) %>%
     dplyr::select(id, days_since_eddi, test_date, sedia_ODn, viral_load, to_peak, all_visits_to_peak)
-# browser()  
   results1 <- c()
   ids <- unique(data_generated$id)
   for (i in 1:length(ids)) {
-    ODn_values <- (data_generated %>%
+    ODn_values1 <- (data_generated %>%
                      filter(id == ids[i])
     )$sedia_ODn
-    results2 <- c()
-    id_list  <- ids[!(ids%in%ids[i])]
-    for (k in 1:length(id_list)) {
-      ODn_values <- (data_generated %>%
-                       filter(id == id_list[k]) # %>%number_ids[i]
-      )$sedia_ODn
-      sd_value   <- sd(ODn_values[-length(ODn_values)])
-      n_length <- length(ODn_values[-length(ODn_values)])
-      results2 <- rbind(results2, cbind(sd_va =sd_value, n_lgth = n_length))
-    }
-    # browser()
-    results2 <- data.frame(results2) %>%
-      mutate(numerator = ((n_lgth - 1) * sd_va^2))
-    g_stddev <- sum(results2$numerator)
-    n_samples <- sum(results2$n_lgth)
     results_by_id <- c()
-    last_value_in_vec <- ODn_values[length(ODn_values)] # g <- 6
-    new_vector <- ODn_values[!(ODn_values %in% last_value_in_vec)]
+    last_value_in_vec <- ODn_values1[length(ODn_values1)] # g <- 6
+    new_vector <- ODn_values1[!(ODn_values1 %in% last_value_in_vec)]
     # browser()
     for (j in 1:(length(new_vector) - 1)) {
       x <- length(new_vector)
       y <- length(new_vector) - j
       list_values <- new_vector[x:y]
-      test_value <- last_value_in_vec # ODn_values[j]
+      test_value <- last_value_in_vec # ODn_values1[j]
       length_list_value <- length(list_values)
-      sd_primary_set <- sd(list_values)
-      avg_list_values <- mean(list_values)
+      sigma_mu_s <- sigma_ODn / length_list_value^.5 #sd(list_values)
+      mu_s <- mean(list_values)
       # browser()
-      p_sd <- ((length(list_values)-1)*sd_primary_set^2 + g_stddev)/((n_samples + length_list_value)-(length(ids)-1))
-      z_test <- (avg_list_values - test_value)/p_sd
+      sigma_Y <- (sigma_mu_s^2  +  sigma_ODn^2)^.5#((((length(list_values) - 1) * sd_primary_set^2) + g_stddev) / ((n_samples + length_list_value) - (length(ids) - 1)))^.5
+      z_test <- (test_value - mu_s) / sigma_Y
       set.seed(11)
       Z <- Normal(0, 1)  # make a standard normal r.v.
       p_value <- 1 - cdf(Z, abs(z_test)) + cdf(Z, -abs(z_test))
       results_by_id <- rbind(results_by_id, cbind(id = ids[i],value = test_value, z_stat = z_test, p_value = p_value)) # value = test_value,
       
-      # results_by_id <- rbind(results_by_id, cbind(id = ids[i], value = test_value, z_test)) # value = test_value,
     }
     # print(ids[i])
     results1 <- rbind(results1, results_by_id)
@@ -599,13 +625,34 @@ compare_lastvalue_with_previous <- function(data_set) {
   return(results1)
 }
 
-compare_first_peak_value <- as_tibble(compare_lastvalue_with_previous(data_set = data_intermitent_suppression_selected_visits)) %>%
-  mutate(significance = ifelse(as.numeric(p_value) < 0.05, TRUE, FALSE))
+compare_first_peak_value <- as_tibble(compare_lastvalue_with_previous(data_set = data_intermitent_suppression_selected_visits,
+                                                                      sigma_ODn = sigma_ODn_func(sedia_generic, threshold = 1000))) %>%
+  mutate(significance = ifelse(as.numeric(p_value) < 0.05, TRUE, FALSE),
+         `P-value` = as.numeric(p_value))
 
 table(compare_first_peak_value$significance)
 
+graph_compare_first_peak_value<-ggplot(compare_first_peak_value, aes(x=`P-value`)) +
+  geom_histogram(color="black", fill="red", position="dodge")+
+  geom_vline( aes(xintercept=0.05),
+              linetype="dashed", size = 1.5)+
+  theme(
+    text = element_text(size = 20),
+    plot.title = element_text(hjust = 0.5),
+    axis.line = element_line(colour = "black"),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    panel.background = element_blank(),
+    panel.border = element_blank(),
+    plot.margin = unit(c(0, 0, 0, 0), "null"),
+    legend.position = "none"
+  )
+# graph_compare_first_peak_value
+jpeg('other_figures/compare_lastvalue_with_previous.jpeg', units = "in", width = 8, height = 6, res = 300)
+graph_compare_first_peak_value
+dev.off()
 #'comparing LAg value with the average of the previous LAg readings
-compare_value_with_previous <- function(data_set, threshold) {
+compare_value_with_previous <- function(data_set, threshold, sigma_ODn) {
   # browser()
   data_generated <- data_set %>%
     select(
@@ -621,68 +668,73 @@ compare_value_with_previous <- function(data_set, threshold) {
     mutate(suprressed_throughout_followup = ifelse(mean(flagvl) == 0, 1, 0)) %>%
     mutate(visits = 1:length(subject_label_blinded)) %>%
     mutate(n_visits = max(visits)) %>%
-    filter(n_visits > 2) %>% # because at this stage we want to compare a with the group average
+    filter(n_visits > 1) %>% # because at this stage we want to compare a with the group average
     ungroup() %>%
     filter(suprressed_throughout_followup == 1) %>%
     mutate(id = as.character(subject_label_blinded)) %>%
     dplyr::select(id, subject_label_blinded, sedia_ODn)
-  # print(length(unique(data_generated$id)))
-  results1 <- c() 
   ids <- unique(data_generated$id)
+  results1 <- c()
   for (i in 1:length(ids)) {
-    ODn_values <- (data_generated %>%
-                     filter(id == ids[i]) # %>%number_ids[i]
+    ODn_values1 <- (data_generated %>%
+      filter(id == ids[i]) # %>%number_ids[i]
     )$sedia_ODn
-    results2 <- c()
-    id_list  <- ids[!(ids%in%ids[i])]
-    for (k in 1:length(id_list)) {
-      ODn_values <- (data_generated %>%
-                       filter(id == id_list[k]) # %>%number_ids[i]
-      )$sedia_ODn
-      sd_value   <- sd(ODn_values)
-      n_length <- length(ODn_values)
-      results2 <- rbind(results2, cbind(sd_va =sd_value, n_lgth = n_length))
-    }
-    # browser()
-    results2 <- data.frame(results2) %>%
-      mutate(numerator = ((n_lgth - 1) * sd_va^2))
-    g_stddev <- sum(results2$numerator)
-    n_samples <- sum(results2$n_lgth)
     results_by_id <- c()
-    # browser()
-    for (j in 3:length(ODn_values)) {
-      test_value <- ODn_values[j]
-      list_values <- ODn_values[(j - 1):1]
-      # z_test <- p_Value_z_test(list_values = list_values, test_value = test_value)
+    for (j in 2:length(ODn_values1)) {
+      test_value <- ODn_values1[j]
+      list_values <- ODn_values1[(j - 1):1]
       length_list_value <- length(list_values)
-      sd_primary_set <- sd(list_values)
-      avg_list_values <- mean(list_values)
-      # browser()
-      p_sd <- ((length(list_values)-1)*sd_primary_set^2 + g_stddev)/((n_samples + length_list_value)-(length(ids)-1))
-      z_test <- (avg_list_values - test_value)/p_sd
+      sigma_mu_s <- sigma_ODn / length_list_value^.5 #sd(list_values)
+      mu_s <- mean(list_values)
+      sigma_Y <- (sigma_mu_s^2  +  sigma_ODn^2)^.5#((((length(list_values) - 1) * sd_primary_set^2) + g_stddev) / ((n_samples + length_list_value) - (length(ids) - 1)))^.5
+      z_test <- (test_value - mu_s) / sigma_Y
       set.seed(11)
-      Z <- Normal(0, 1)  # make a standard normal r.v.
+      Z <- Normal(0, 1) # make a standard normal r.v.
       p_value <- 1 - cdf(Z, abs(z_test)) + cdf(Z, -abs(z_test))
-      results_by_id <- rbind(results_by_id, cbind(id = ids[i],value = test_value, z_stat = z_test, p_value = p_value)) # value = test_value,
-      # z_test <- p_Value_z_test(list_values = list_values, test_value = test_value)
-      # results_by_id <- rbind(results_by_id, cbind(id = ids[i], value = test_value, z_test)) # value = test_value,
+      results_by_id <- rbind(results_by_id, cbind(id = ids[i], value = test_value, z_stat = z_test, p_value = p_value)) # value = test_value,
+      
     }
     results1 <- rbind(results1, results_by_id)
   }
-  
+
   return(cbind(results1, threshold = threshold))
-  
 }
 
 results_suppressed <- c()
 for (i in c(100, 400, 1000)) {
   # results1 <- c()
-  results_suppressed <- rbind(results_suppressed, compare_value_with_previous(data_set = sedia_generic, threshold = i))
+  results_suppressed <- rbind(results_suppressed, compare_value_with_previous(data_set = sedia_generic, threshold = i,
+                                                                              sigma_ODn = sigma_ODn_func(sedia_generic, threshold = 1000)))
   
 }
 results_suppressed2 <- as_tibble(results_suppressed) %>%
   distinct(id, value, z_stat, p_value, .keep_all = T) %>%
-  mutate(significance = ifelse(as.numeric(p_value) < 0.05, TRUE, FALSE))
+  # filter(threshold==1000) %>%
+  mutate(#`significance alpha 1%` = ifelse(as.numeric(p_value) < 0.01, TRUE, FALSE),
+         # `significance alpha 1.5%` = ifelse(as.numeric(p_value) < 0.015, TRUE, FALSE),
+         # `significance alpha 2%` = ifelse(as.numeric(p_value) < 0.02, TRUE, FALSE),
+         # `significance alpha 2.5%` = ifelse(as.numeric(p_value) < 0.025, TRUE, FALSE),
+         `significance alpha 5%` = ifelse(as.numeric(p_value) < 0.05, TRUE, FALSE),
+         `P-value` = as.numeric(p_value))
 
-table(results_suppressed2$significance)
+table(results_suppressed2$`significance alpha 5%`)
 
+graph_results_suppressed2<-ggplot(results_suppressed2, aes(x=`P-value`)) +
+  geom_histogram(color="black", fill="red", position="dodge")+
+  geom_vline( aes(xintercept=0.05),
+              linetype="dashed", size = 1.5)  +
+  theme(
+    text = element_text(size = 20),
+    plot.title = element_text(hjust = 0.5),
+    axis.line = element_line(colour = "black"),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    panel.background = element_blank(),
+    panel.border = element_blank(),
+    plot.margin = unit(c(0, 0, 0, 0), "null"),
+    legend.position = "none"
+  )
+# graph_results_suppressed2
+jpeg('other_figures/compare_value_with_previous.jpeg', units = "in", width = 8, height = 6, res = 300)
+graph_results_suppressed2
+dev.off()
