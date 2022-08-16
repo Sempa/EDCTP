@@ -627,11 +627,27 @@ compare_lastvalue_with_previous <- function(data_set, sigma_ODn) {
 
 compare_first_peak_value <- as_tibble(compare_lastvalue_with_previous(data_set = data_intermitent_suppression_selected_visits,
                                                                       sigma_ODn = sigma_ODn_func(sedia_generic, threshold = 1000))) %>%
-  mutate(significance = ifelse(as.numeric(p_value) < 0.05, TRUE, FALSE),
+  mutate(`significance 99%` = ifelse(as.numeric(z_stat) > qnorm(0.99), TRUE, FALSE),
+         `significance 98.5%` = ifelse(as.numeric(z_stat) > qnorm(0.985), TRUE, FALSE),
+         `significance 98%` = ifelse(as.numeric(z_stat) > qnorm(0.98), TRUE, FALSE),
+         `significance 97.5%` = ifelse(as.numeric(z_stat) > qnorm(0.975), TRUE, FALSE),
+         `significance 95%` = ifelse(as.numeric(z_stat) > qnorm(0.95), TRUE, FALSE),
          `P-value` = as.numeric(p_value))
 
-table(compare_first_peak_value$significance)
+# table(compare_first_peak_value$`significance 95%`)
+# table(compare_first_peak_value$`significance 97.5%`)
+# table(compare_first_peak_value$`significance 98%`)
+# table(compare_first_peak_value$`significance 98.5%`)
+# table(compare_first_peak_value$`significance 99%`)
 
+sensitivity_value <- cbind(`Accuracy values` = c(
+  round(table(compare_first_peak_value$`significance 95%`)[[2]] / (table(compare_first_peak_value$`significance 95%`)[[1]] + table(compare_first_peak_value$`significance 95%`)[[2]]), 3),
+  round(table(compare_first_peak_value$`significance 97.5%`)[[2]] / (table(compare_first_peak_value$`significance 97.5%`)[[1]] + table(compare_first_peak_value$`significance 97.5%`)[[2]]), 3),
+  round(table(compare_first_peak_value$`significance 98%`)[[2]] / (table(compare_first_peak_value$`significance 98%`)[[1]] + table(compare_first_peak_value$`significance 98%`)[[2]]), 3),
+  round(table(compare_first_peak_value$`significance 98.5%`)[[2]] / (table(compare_first_peak_value$`significance 98.5%`)[[1]] + table(compare_first_peak_value$`significance 98.5%`)[[2]]), 3),
+  round(table(compare_first_peak_value$`significance 99%`)[[2]] / (table(compare_first_peak_value$`significance 99%`)[[1]] + table(compare_first_peak_value$`significance 99%`)[[2]]), 3)
+), level = c('Significance 95%', 'Significance 97.5%', 'Significance 98%', 'Significance 98.5%', 'Significance 99%'), Accuracy = rep('Sensitivity', 5)
+)
 graph_compare_first_peak_value<-ggplot(compare_first_peak_value, aes(x=`P-value`)) +
   geom_histogram(color="black", fill="red", position="dodge")+
   geom_vline( aes(xintercept=0.05),
@@ -710,14 +726,24 @@ for (i in c(100, 400, 1000)) {
 results_suppressed2 <- as_tibble(results_suppressed) %>%
   distinct(id, value, z_stat, p_value, .keep_all = T) %>%
   # filter(threshold==1000) %>%
-  mutate(#`significance alpha 1%` = ifelse(as.numeric(p_value) < 0.01, TRUE, FALSE),
-         # `significance alpha 1.5%` = ifelse(as.numeric(p_value) < 0.015, TRUE, FALSE),
-         # `significance alpha 2%` = ifelse(as.numeric(p_value) < 0.02, TRUE, FALSE),
-         # `significance alpha 2.5%` = ifelse(as.numeric(p_value) < 0.025, TRUE, FALSE),
-         `significance alpha 5%` = ifelse(as.numeric(p_value) < 0.05, TRUE, FALSE),
-         `P-value` = as.numeric(p_value))
+  mutate(`significance 99%` = ifelse(as.numeric(z_stat) > qnorm(0.99), TRUE, FALSE),
+         `significance 98.5%` = ifelse(as.numeric(z_stat) > qnorm(0.985), TRUE, FALSE),
+         `significance 98%` = ifelse(as.numeric(z_stat) > qnorm(0.98), TRUE, FALSE),
+         `significance 97.5%` = ifelse(as.numeric(z_stat) > qnorm(0.975), TRUE, FALSE),
+         `significance 95%` = ifelse(as.numeric(z_stat) > qnorm(0.95), TRUE, FALSE),
+         `P-value` = as.numeric(p_value)) %>%
+  group_by(id) %>%
+  mutate(n_comparison = 2:(length(id)+1))
 
-table(results_suppressed2$`significance alpha 5%`)
+#table(results_suppressed2$`significance 97.5%`)
+specificity_value <- cbind(`Accuracy values` = c(
+  round(table(results_suppressed2$`significance 95%`)[[1]] / (table(results_suppressed2$`significance 95%`)[[1]] + table(results_suppressed2$`significance 95%`)[[2]]), 3),
+  round(table(results_suppressed2$`significance 97.5%`)[[1]] / (table(results_suppressed2$`significance 97.5%`)[[1]] + table(results_suppressed2$`significance 97.5%`)[[2]]), 3),
+  round(table(results_suppressed2$`significance 98%`)[[1]] / (table(results_suppressed2$`significance 98%`)[[1]] + table(results_suppressed2$`significance 98%`)[[2]]), 3),
+  round(table(results_suppressed2$`significance 98.5%`)[[1]] / (table(results_suppressed2$`significance 98.5%`)[[1]] + table(results_suppressed2$`significance 98.5%`)[[2]]), 3),
+  round(table(results_suppressed2$`significance 99%`)[[1]] / (table(results_suppressed2$`significance 99%`)[[1]] + table(results_suppressed2$`significance 99%`)[[2]]), 3)
+), level = c('Significance 95%', 'Significance 97.5%', 'Significance 98%', 'Significance 98.5%', 'Significance 99%'), Accuracy = rep(c('Specificity'), 5)
+)
 
 graph_results_suppressed2<-ggplot(results_suppressed2, aes(x=`P-value`)) +
   geom_histogram(color="black", fill="red", position="dodge")+
@@ -737,4 +763,26 @@ graph_results_suppressed2<-ggplot(results_suppressed2, aes(x=`P-value`)) +
 # graph_results_suppressed2
 jpeg('other_figures/compare_value_with_previous.jpeg', units = "in", width = 8, height = 6, res = 300)
 graph_results_suppressed2
+dev.off()
+
+accuracy_dataset <- data.frame(rbind(sensitivity_value, specificity_value)) %>%
+  arrange(level) %>%
+  ggplot(aes(x = level, y = Accuracy.values, fill = Accuracy)) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  scale_fill_manual(values=c('#999999','#E69F00'))  +
+  theme(
+    text = element_text(size = 20),
+    plot.title = element_text(hjust = 0.5),
+    axis.line = element_line(colour = "black"),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    panel.background = element_blank(),
+    panel.border = element_blank(),
+    plot.margin = unit(c(0, 0, 0, 0), "null"),
+    axis.text.x = element_text(angle = 60, hjust = 1)#,
+    # legend.position = "none"
+  )
+# accuracy_dataset
+jpeg('other_figures/accuracy_barplot.jpeg', units = "in", width = 8, height = 6, res = 300)
+accuracy_dataset
 dev.off()
