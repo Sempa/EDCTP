@@ -786,3 +786,51 @@ accuracy_dataset <- data.frame(rbind(sensitivity_value, specificity_value)) %>%
 jpeg('other_figures/accuracy_barplot.jpeg', units = "in", width = 8, height = 6, res = 300)
 accuracy_dataset
 dev.off()
+
+##########Plotting the Z-scores###########
+z_score_data <- compare_first_peak_value %>%
+  dplyr::select(id, value, z_stat) %>%
+  mutate(`Group` = 'to unsuppressed') %>%
+  bind_rows(results_suppressed2 %>% dplyr::select(id, value, z_stat) %>% mutate(`Group` = 'fully suppressed')) 
+accuracy_dataset <- c()
+threshold <- seq(0,3, 0.2)
+for (i in 1:length(threshold)) {
+    dat_set1 <- z_score_data %>%
+      filter(Group == 'to unsuppressed') %>%
+    mutate(x = ifelse(as.numeric(z_stat) > threshold[i], TRUE, FALSE))
+    sensitivity_value <- round(table(dat_set1$x)[[2]] / (table(dat_set1$x)[[1]] + table(dat_set1$x)[[2]]), 3)
+    
+    dat_set2 <- z_score_data %>%
+      filter(Group == 'fully suppressed') %>%
+      mutate(x = ifelse(as.numeric(z_stat) > threshold[i], TRUE, FALSE))
+    specificity_value <- round(table(dat_set2$x)[[1]] / (table(dat_set2$x)[[1]] + table(dat_set2$x)[[2]]), 3)
+    dt <- c(`Z score` = threshold[i], value1 = sensitivity_value, value2 = specificity_value)
+    accuracy_dataset <- rbind(accuracy_dataset, dt)
+}
+
+accuracy_graph <- data.frame(accuracy_dataset) %>%
+  pivot_longer(cols = c('value1', 'value2'),
+               names_to = 'accuracy',
+               values_to = 'Accuracy.values') %>%
+  mutate(Accuracy = ifelse(accuracy=='value1', 'Sensitivity', 'Specificity')) %>%
+  ggplot(aes(x = Z.score, y = Accuracy.values, fill = Accuracy)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_manual(values=c('#999999','#E69F00'))  +
+  scale_y_continuous(breaks=c(0.00,.10,.20,.30,.40,.50,.60,.70,.80,.90,1.00)) +
+  scale_x_continuous(breaks = c(seq(0, 3, 0.2)), labels = c(seq(0, 3, 0.2))) +
+  ylab('Accuracy values') + xlab('Z score') +
+  theme(
+    text = element_text(size = 20),
+    plot.title = element_text(hjust = 0.5),
+    axis.line = element_line(colour = "black"),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    panel.background = element_blank(),
+    panel.border = element_blank(),
+    plot.margin = unit(c(0, 0, 0, 0), "null"),
+    axis.text.x = element_text(angle = 60, hjust = 1)
+  )
+# accuracy_graph
+jpeg('other_figures/accuracy_barplot.jpeg', units = "in", width = 8, height = 6, res = 300)
+accuracy_graph
+dev.off()
