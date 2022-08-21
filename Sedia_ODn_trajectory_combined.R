@@ -267,7 +267,7 @@ data_intermitent_suppression <- read_csv("data/20180410-EP-LAgSedia-Generic.csv"
 
 #' does the slope for ODn among those with ODn<2 differ from those with ODn>2 in
 #' patients peaking?
-write.csv(data_intermitent_suppression, "output_table/intermitent_suppression.csv")
+# write.csv(data_intermitent_suppression, "output_table/intermitent_suppression.csv")
 data_intermitent_suppression_selected_visits <- read.csv("output_table/intermitent_suppression_selected.csv") %>%
   mutate(all_visits_to_peak = ifelse(subject_label_blinded == 28848447, NA, all_visits_to_peak))
 data_intermitent_suppression_toPeak_visits <- data_intermitent_suppression_selected_visits %>%
@@ -818,7 +818,7 @@ accuracy_graph <- data.frame(accuracy_dataset) %>%
   scale_fill_manual(values=c('#999999','#E69F00'))  +
   scale_y_continuous(breaks=c(0.00,.10,.20,.30,.40,.50,.60,.70,.80,.90,1.00)) +
   scale_x_continuous(breaks = c(seq(0, 3, 0.2)), labels = c(seq(0, 3, 0.2))) +
-  ylab('Accuracy values') + xlab('Z score') +
+  ylab('Accuracy values') + xlab('Z value') +
   theme(
     text = element_text(size = 20),
     plot.title = element_text(hjust = 0.5),
