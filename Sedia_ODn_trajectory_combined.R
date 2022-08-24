@@ -133,8 +133,8 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
   dx <- density(x)
   jpeg(paste(folder_name, "/", "Figure_link_identity", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
   
-  hist(model_data$slope_link_identity, breaks = 30, freq = FALSE, main = paste("Mean slope link=identity_", threshold))
-  lines(dx, lwd = 2, col = "red")
+  hist(model_data$slope_link_identity, breaks = 30, freq = FALSE, main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  lines(dx, lwd = 3, col = "red")
   
   # print(
     # model_data %>%
@@ -169,8 +169,8 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
   
   jpeg(paste(folder_name, "/", "Figure_link_log", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
   
-  hist(model_data$slope_link_log, breaks = 30, freq = FALSE, main = paste("Mean slope link=log_", threshold))
-  lines(dx, lwd = 2, col = "red")
+  hist(model_data$slope_link_log, breaks = 30, freq = FALSE, main = paste("Mean slope link=log_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  lines(dx, lwd = 3, col = "red")
   
   # print(
   #   model_data %>%
@@ -342,11 +342,11 @@ slopes_for_unsuppressed <- function(ODn_vl_data, threshold) {
   set.seed(11)
   x <- rnorm(5e3, mean = mean(model_data$`slope link identity`, na.rm = T), sd = sd(model_data$`slope link identity`))
   dx <- density(x)
-  
+  # browser()
   jpeg(paste(folder_name, "/", "Figure_link_identity", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
   
-  hist(model_data$`slope link identity`, breaks = 30, freq = FALSE, main = paste("Mean slope link=identity_", threshold))
-  lines(dx, lwd = 2, col = "red")
+  hist(model_data$`slope link identity`, breaks = 30, freq = FALSE, main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  lines(dx, lwd = 3, col = "red")
   
   # print(
   #   model_data %>%
@@ -382,8 +382,8 @@ slopes_for_unsuppressed <- function(ODn_vl_data, threshold) {
   
   jpeg(paste(folder_name, "/", "Figure_link_log",threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
   
-  hist(model_data$`slope link log`, breaks = 30, freq = FALSE, main = paste("Mean slope link=log_", threshold))
-  lines(dx, lwd = 2, col = "red")
+  hist(model_data$`slope link log`, breaks = 30, freq = FALSE, main = paste("Mean slope link=log_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  lines(dx, lwd = 3, col = "red")
   
   # print(
   #   model_data %>%
