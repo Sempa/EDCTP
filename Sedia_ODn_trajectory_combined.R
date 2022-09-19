@@ -1028,12 +1028,14 @@ accuracy_graph <- data.frame(accuracy_dataset) %>%
                names_to = 'accuracy',
                values_to = 'Accuracy.values') %>%
   mutate(Accuracy = ifelse(accuracy=='value1', 'Sensitivity', 'Specificity')) %>%
-  ggplot(aes(x = Z.score, y = Accuracy.values, fill = Accuracy)) +
-  geom_bar(stat = "identity", position = position_dodge()) +
-  scale_fill_manual(values=c('#999999','#E69F00'))  +
-  scale_y_continuous(breaks=c(0.00,.10,.20,.30,.40,.50,.60,.70,.80,.90,1.00)) +
-  scale_x_continuous(breaks = c(seq(0, 3, 0.2)), labels = c(seq(0, 3, 0.2))) +
-  ylab('Accuracy values') + xlab('Z value') +
+  ggplot(aes(x = Z.score, y = Accuracy.values, group = Accuracy)) +
+  geom_line(aes(color = Accuracy), size = 1.5) + #stat = "identity", position = position_dodge()
+  geom_point(aes(color = Accuracy), size = 3) +
+  scale_color_manual(values=c('#999999','#E69F00'))  +
+  scale_y_continuous(limits = c(0,1)) +
+  scale_x_continuous(breaks = c(seq(0, 3, 0.5)), labels = c(seq(0, 3, 0.5))) +
+  ylab('') + xlab('Z value threshold') +
+  labs(colour = NULL) +
   theme(
     text = element_text(size = 20),
     plot.title = element_text(hjust = 0.5),
@@ -1042,10 +1044,10 @@ accuracy_graph <- data.frame(accuracy_dataset) %>%
     axis.title = element_text(size = 18),
     panel.background = element_blank(),
     panel.border = element_blank(),
-    plot.margin = unit(c(0, 0, 0, 0), "null"),
-    axis.text.x = element_text(angle = 60, hjust = 1)
+    plot.margin = unit(c(0, 0, 0, 0), "null")#,
+    # axis.text.x = element_text(angle = 60, hjust = 1)
   )
 # accuracy_graph
-jpeg('other_figures/accuracy_barplot.jpeg', units = "in", width = 8, height = 6, res = 300)
+jpeg('other_figures/accuracy_linegraph.jpeg', units = "in", width = 8, height = 6, res = 300)
 accuracy_graph
 dev.off()
