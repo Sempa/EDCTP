@@ -171,7 +171,7 @@ sedia_diffs_data_sorting <- data_sorting %>%
   filter(suprressed_throughout_followup_1000 == 1 | to_peak == 1 | to_trough == 1
   ) %>%
   filter(!is.na(sedia_slope)) %>%
-  mutate(sedia_diff = sedia_ODn - sedia_ODn_2)
+  mutate(sedia_diff = sedia_ODn_2 - sedia_ODn)
 
 t.test((sedia_diffs_data_sorting %>%
           filter(suprressed_throughout_followup_100 == 1))$sedia_diff)
@@ -210,17 +210,17 @@ dat <- sedia_diffs_data_sorting %>%
   x <- rnorm(5e3, mean = mean(dat$sedia_diff), sd = sd(dat$sedia_diff))
   dx <- density(x)
   jpeg('other_figures/Figure_less_1000.jpeg', units = "in", width = 8, height = 6, res = 300)
-  hist(dat$sedia_diff, breaks = 30, freq = FALSE, main = "Distribution of Sedia differences_less 1e3")
+  hist(dat$sedia_diff, breaks = 30, freq = FALSE, col = 'black', xlab = 'Sedia LAg differences', cex.lab = 1.5, cex.axis = 1.5, main = '')#main = "Distribution of Sedia differences_less 1e3")
   lines(dx, lwd = 2, col = "red")
   dev.off()
-  
+
 dat <- sedia_diffs_data_sorting %>%
   filter(to_peak == 1)
   set.seed(11)
   x <- rnorm(5e3, mean = mean(dat$sedia_diff), sd = sd(dat$sedia_diff))
   dx <- density(x)
   jpeg('other_figures/Figure_to_peak.jpeg', units = "in", width = 8, height = 6, res = 300)
-  hist(dat$sedia_diff, breaks = 30, freq = FALSE, main = "Distribution of Sedia differences_to peak")
+  hist(dat$sedia_diff, breaks = 30, freq = FALSE, col = 'black', xlab = 'Sedia LAg differences', cex.lab = 1.5, cex.axis = 1.5, main = '')# main = "Distribution of Sedia differences_to peak")
   lines(dx, lwd = 2, col = "red")
   dev.off()
   
@@ -230,7 +230,7 @@ dat <- sedia_diffs_data_sorting %>%
   x <- rnorm(5e3, mean = mean(dat$sedia_diff), sd = sd(dat$sedia_diff))
   dx <- density(x)
   jpeg('other_figures/Figure_to_trough.jpeg', units = "in", width = 8, height = 6, res = 300)
-  hist(dat$sedia_diff, breaks = 30, freq = FALSE, main = "Distribution of Sedia differences_to trough")
+  hist(dat$sedia_diff, breaks = 30, freq = FALSE, col = 'black', xlab = 'Sedia LAg differences', cex.lab = 1.5, cex.axis = 1.5, main = '') #main = "Distribution of Sedia differences_to trough")
   lines(dx, lwd = 2, col = "red")
   dev.off()
   
