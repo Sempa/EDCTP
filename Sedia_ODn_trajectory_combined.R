@@ -150,7 +150,7 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
     # print(i)
   }
   # summary(model_data$slope_link_identity, na.rm = T)
-  # browser()
+  browser()
   set.seed(11)
   x <- rnorm(5e3, mean = mean(model_data$slope_link_identity, na.rm = T), sd = sd(model_data$slope_link_identity))
   dx <- density(x)
