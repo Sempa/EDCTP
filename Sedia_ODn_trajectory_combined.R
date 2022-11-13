@@ -150,13 +150,17 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
     # print(i)
   }
   # summary(model_data$slope_link_identity, na.rm = T)
-  browser()
+  # browser()
+  hist_plot1 <- hist(model_data$slope_link_identity, breaks = 30, freq = FALSE, ylab = '', xlab = 'Individual slopes', main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  area_hist1 <- sum(hist_plot1$counts* abs(hist_plot1$mids[1]-hist_plot1$mids[2]))
+  n_values1 <- sum(hist_plot1$counts / area_hist1)
   set.seed(11)
-  x <- rnorm(5e3, mean = mean(model_data$slope_link_identity, na.rm = T), sd = sd(model_data$slope_link_identity))
+  x <- rnorm(n_values1, mean = mean(model_data$slope_link_identity, na.rm = T), sd = sd(model_data$slope_link_identity))
   dx <- density(x)
   jpeg(paste(folder_name, "/", "Figure_link_identity", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
+  hist(model_data$slope_link_identity, breaks = 30, freq = FALSE, ylab = '', xlab = 'Slopes of individuals', main = '', col = 'black', cex.lab = 2, cex.axis = 2) #, main = paste("Density plot link=identity_", threshold)
   
-  hist(model_data$slope_link_identity, breaks = 30, freq = FALSE, main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  # hist(model_data$slope_link_identity, breaks = 30, freq = FALSE, ylab = '', xlab = 'Individual slopes', main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
   lines(dx, lwd = 3, col = "red")
   
   # print(
@@ -186,13 +190,16 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
   # )
   dev.off()
   # summary(model_data$slope_link_log, na.rm = T)
+  hist_plot2 <- hist(model_data$slope_link_log, breaks = 30, freq = FALSE, ylab = '', xlab = 'Individual slopes', main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  area_hist2 <- sum(hist_plot2$counts* abs(hist_plot2$mids[1]-hist_plot2$mids[2]))
+  n_values2 <- sum(hist_plot2$counts / area_hist2)
   set.seed(11)
-  x <- rnorm(5e3, mean = mean(model_data$slope_link_log, na.rm = T), sd = sd(model_data$slope_link_log))
+  x <- rnorm(n_values2, mean = mean(model_data$slope_link_log, na.rm = T), sd = sd(model_data$slope_link_log))
   dx <- density(x)
   
   jpeg(paste(folder_name, "/", "Figure_link_log", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
   
-  hist(model_data$slope_link_log, breaks = 30, freq = FALSE, main = paste("Mean slope link=log_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  hist(model_data$slope_link_log, breaks = 30, freq = FALSE, ylab = '', xlab = 'Slopes of individuals', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
   lines(dx, lwd = 3, col = "red")
   
   # print(
@@ -341,12 +348,16 @@ slopes_for_suppressed_straddling_ARTstart <- function(ODn_vl_data, threshold) {
   }
   # summary(model_data$slope_link_identity, na.rm = T)
   # browser()
+  hist_plot1 <- hist(model_data$slope_link_identity, breaks = 30, freq = FALSE, ylab = '', xlab = 'Individual slopes', main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  area_hist1 <- sum(hist_plot1$counts* abs(hist_plot1$mids[1]-hist_plot1$mids[2]))
+  n_values1 <- sum(hist_plot1$counts / area_hist1)
   set.seed(11)
-  x <- rnorm(5e3, mean = mean(model_data$slope_link_identity, na.rm = T), sd = sd(model_data$slope_link_identity))
+  x <- rnorm(n_values1, mean = mean(model_data$slope_link_identity, na.rm = T), sd = sd(model_data$slope_link_identity))
   dx <- density(x)
   jpeg(paste(folder_name, "/", "Figure_link_identity", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
+  hist(model_data$slope_link_identity, breaks = 30, freq = FALSE, ylab = '', xlab = 'Slopes of individuals', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
   
-  hist(model_data$slope_link_identity, breaks = 30, freq = FALSE, main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  # hist(model_data$slope_link_identity, breaks = 30, freq = FALSE, main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
   lines(dx, lwd = 3, col = "red")
   
   # print(
@@ -376,13 +387,15 @@ slopes_for_suppressed_straddling_ARTstart <- function(ODn_vl_data, threshold) {
   # )
   dev.off()
   # summary(model_data$slope_link_log, na.rm = T)
+  hist_plot2 <- hist(model_data$slope_link_log, breaks = 30, freq = FALSE, ylab = '', xlab = 'Individual slopes', main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  area_hist2 <- sum(hist_plot2$counts* abs(hist_plot2$mids[1]-hist_plot2$mids[2]))
+  n_values2 <- sum(hist_plot2$counts / area_hist2)
   set.seed(11)
-  x <- rnorm(5e3, mean = mean(model_data$slope_link_log, na.rm = T), sd = sd(model_data$slope_link_log))
+  x <- rnorm(n_values2, mean = mean(model_data$slope_link_log, na.rm = T), sd = sd(model_data$slope_link_log))
   dx <- density(x)
-  
   jpeg(paste(folder_name, "/", "Figure_link_log", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
-  
-  hist(model_data$slope_link_log, breaks = 30, freq = FALSE, main = paste("Mean slope link=log_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  hist(model_data$slope_link_log, breaks = 30, freq = FALSE, ylab = '', xlab = 'Slopes of individuals', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # main = paste("Density plot link=identity_", threshold), 
+  # hist(model_data$slope_link_log, breaks = 30, freq = FALSE, main = paste("Mean slope link=log_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
   lines(dx, lwd = 3, col = "red")
   
   # print(
@@ -554,13 +567,18 @@ slopes_for_unsuppressed <- function(ODn_vl_data, threshold) {
   model_data <- model_data %>%
     mutate(`slope link identity` = as.numeric(slope_link_identity),
            `slope link log` = as.numeric(slope_link_log))
+  
+  hist_plot1 <- hist(model_data$`slope link identity`, breaks = 30, freq = FALSE, ylab = '', xlab = 'Individual slopes', main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  area_hist1 <- sum(hist_plot1$counts* abs(hist_plot1$mids[1]-hist_plot1$mids[2]))
+  n_values1 <- sum(hist_plot1$counts / area_hist1)
+  
   set.seed(11)
-  x <- rnorm(5e3, mean = mean(model_data$`slope link identity`, na.rm = T), sd = sd(model_data$`slope link identity`))
+  x <- rnorm(n_values1, mean = mean(model_data$`slope link identity`, na.rm = T), sd = sd(model_data$`slope link identity`))
   dx <- density(x)
   # browser()
   jpeg(paste(folder_name, "/", "Figure_link_identity", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
   
-  hist(model_data$`slope link identity`, breaks = 30, freq = FALSE, main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  hist(model_data$`slope link identity`, breaks = 30, freq = FALSE, ylab = '', xlab = 'Slopes of individuals', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
   lines(dx, lwd = 3, col = "red")
   
   # print(
@@ -589,15 +607,17 @@ slopes_for_unsuppressed <- function(ODn_vl_data, threshold) {
   #     ggtitle(paste("histogram mean slope link=identity_", threshold))
   # )
   dev.off()
-  
+  hist_plot2 <- hist(model_data$`slope link log`, breaks = 30, freq = FALSE, ylab = '', xlab = 'Individual slopes', main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  area_hist2 <- sum(hist_plot2$counts* abs(hist_plot2$mids[1]-hist_plot2$mids[2]))
+  n_values2 <- sum(hist_plot2$counts / area_hist2)
   set.seed(11)
-  x <- rnorm(5e3, mean = mean(model_data$`slope link log`, na.rm = T), sd = sd(model_data$`slope link log`))
+  x <- rnorm(n_values2, mean = mean(model_data$`slope link log`, na.rm = T), sd = sd(model_data$`slope link log`))
   dx <- density(x)
   
   
   jpeg(paste(folder_name, "/", "Figure_link_log",threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
   
-  hist(model_data$`slope link log`, breaks = 30, freq = FALSE, main = paste("Mean slope link=log_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
+  hist(model_data$`slope link log`, breaks = 30, freq = FALSE, ylab = '', xlab = 'Slopes of individuals', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
   lines(dx, lwd = 3, col = "red")
   
   # print(
