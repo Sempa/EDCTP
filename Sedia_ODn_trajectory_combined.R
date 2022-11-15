@@ -126,7 +126,7 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
       ggtitle(paste("Sedia ODn vs EDDI_", threshold))
   )
   dev.off()
-
+browser()
   model_data <- data.frame(
     id = NA, interceptlink_identity = NA, slope_link_identity = NA,
     intercept_link_log = NA, slope_link_log = NA
@@ -163,31 +163,6 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
   # hist(model_data$slope_link_identity, breaks = 30, freq = FALSE, ylab = '', xlab = 'Individual slopes', main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
   lines(dx, lwd = 3, col = "red")
   
-  # print(
-    # model_data %>%
-    #   ggplot(aes(x = slope_link_identity)) +
-    #   geom_histogram(color = "#e9ecef", alpha = 0.6, bins = 30, position = "identity") +
-    #   scale_fill_manual(values = c("#69b3a2", "#404080")) +
-    #   labs(fill = "") +
-    #   geom_density(
-    #     lwd = 1.2,
-    #     linetype = 1,
-    #     colour = 2
-    #   ) +
-    #   theme(
-    #     text = element_text(size = 20),
-    #     plot.title = element_text(hjust = 0.5),
-    #     axis.line = element_line(colour = "black"),
-    #     axis.text = element_text(size = 18),
-    #     axis.title = element_text(size = 18),
-    #     panel.background = element_blank(),
-    #     panel.border = element_blank(),
-    #     plot.margin = unit(c(0, 0, 0, 0), "null"),
-    #     legend.position = "none"
-    #   ) +
-    #   ggtitle(paste("histogram mean slope link=identity_", threshold))
-    
-  # )
   dev.off()
   # summary(model_data$slope_link_log, na.rm = T)
   hist_plot2 <- hist(model_data$slope_link_log, breaks = 30, freq = FALSE, ylab = '', xlab = 'Individual slopes', main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
@@ -202,30 +177,6 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
   hist(model_data$slope_link_log, breaks = 30, freq = FALSE, ylab = '', xlab = 'Slopes of individuals', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
   lines(dx, lwd = 3, col = "red")
   
-  # print(
-  #   model_data %>%
-  #     ggplot(aes(x = slope_link_log)) +
-  #     geom_histogram(color = "#e9ecef", alpha = 0.6, bins = 30, position = "identity") +
-  #     scale_fill_manual(values = c("#69b3a2", "#404080")) +
-  #     labs(fill = "") +
-  #     geom_density(
-  #       lwd = 1.2,
-  #       linetype = 1,
-  #       colour = 2
-  #     ) +
-  #     theme(
-  #       text = element_text(size = 20),
-  #       plot.title = element_text(hjust = 0.5),
-  #       axis.line = element_line(colour = "black"),
-  #       axis.text = element_text(size = 18),
-  #       axis.title = element_text(size = 18),
-  #       panel.background = element_blank(),
-  #       panel.border = element_blank(),
-  #       plot.margin = unit(c(0, 0, 0, 0), "null"),
-  #       legend.position = "none"
-  #     ) +
-  #     ggtitle(paste("histogram mean slope link=log_", threshold))
-  # )
   dev.off()
 
   return(
@@ -804,13 +755,13 @@ table(results_suppressed1$significance)
 graph_results_suppressed1<-ggplot(results_suppressed1, aes(x=`P-value`)) +
   geom_histogram(color="black", fill="red", position="dodge")+
   geom_vline( aes(xintercept=0.05),
-             linetype="dashed", size = 1.5)+
+             linetype="dashed", size = 2)+
   theme(
           text = element_text(size = 20),
           plot.title = element_text(hjust = 0.5),
           axis.line = element_line(colour = "black"),
-          axis.text = element_text(size = 18),
-          axis.title = element_text(size = 18),
+          axis.text = element_text(size = 20),
+          axis.title = element_text(size = 20),
           panel.background = element_blank(),
           panel.border = element_blank(),
           plot.margin = unit(c(0, 0, 0, 0), "null"),
@@ -886,13 +837,13 @@ sensitivity_value <- cbind(`Accuracy values` = c(
 graph_compare_first_peak_value<-ggplot(compare_first_peak_value, aes(x=`P-value`)) +
   geom_histogram(color="black", fill="red", position="dodge")+
   geom_vline( aes(xintercept=0.05),
-              linetype="dashed", size = 1.5)+
+              linetype="dashed", size = 2)+
   theme(
     text = element_text(size = 20),
     plot.title = element_text(hjust = 0.5),
     axis.line = element_line(colour = "black"),
-    axis.text = element_text(size = 18),
-    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 20),
+    axis.title = element_text(size = 20),
     panel.background = element_blank(),
     panel.border = element_blank(),
     plot.margin = unit(c(0, 0, 0, 0), "null"),
@@ -983,13 +934,13 @@ specificity_value <- cbind(`Accuracy values` = c(
 graph_results_suppressed2<-ggplot(results_suppressed2, aes(x=`P-value`)) +
   geom_histogram(color="black", fill="red", position="dodge")+
   geom_vline( aes(xintercept=0.05),
-              linetype="dashed", size = 1.5)  +
+              linetype="dashed", size = 2)  +
   theme(
     text = element_text(size = 20),
     plot.title = element_text(hjust = 0.5),
     axis.line = element_line(colour = "black"),
-    axis.text = element_text(size = 18),
-    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 20),
+    axis.title = element_text(size = 20),
     panel.background = element_blank(),
     panel.border = element_blank(),
     plot.margin = unit(c(0, 0, 0, 0), "null"),
