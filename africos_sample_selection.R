@@ -24,13 +24,15 @@ final_dataset <- pt_dataset %>%
   # mutate(flag_suppressed_visit = ifelse(visit_after_ARTstart==1))
   ungroup() %>%
   mutate(stradlling_art_start = ifelse(`NUMERIC DATE FOR art_sdt` > first_visit_date, T, F), #166 with ART start after first VL visit
-         `missing vl` = ifelse(!is.na(`Viral Load Result Prefix`), F, T) # 1435 missing viral loads
+         `missing vl` = ifelse(!is.na(vl), F, T) # 236 missing viral loads But 38 visits have plasma vl available
          ) %>% 
-  filter(!is.na(`Viral Load Result Prefix`)) %>%
+  filter(!is.na(vl)) %>%
   mutate(detectable_vl = ifelse((visit_after_ARTstart == 1 & `VL Copies/mL` >1000), 1, 0)) %>%
   group_by(`SUBJECT ID (CHAR)`) %>%
   mutate(ever_unsuppressed_after_artstart = max(detectable_vl, na.rm = T)) #%>% #28 people with detectable VL after ART start
   # mutate(ever_unsuppressed_in_follo_wp = ifelse(`SUBJECT ID (CHAR)` %in%))
+m=final_dataset%>%dplyr::select(`SUBJECT ID (CHAR)`, `PlACD Vol`, `PlACD  Vials` , vl, `missing vl`) %>% mutate(`missing plasma` = ifelse((`PlACD Vol`!='N/A' | `PlACD  Vials` != 'N/A') & is.na(vl), 1,0))
+table(m$`missing plasma`)
 x=final_dataset%>%
    filter(ever_unsuppressed_after_artstart == 1) #%>%
 ## selecting patients who have been followed up for at least 2yrs
