@@ -42,7 +42,8 @@ final_dataset <- pt_dataset %>%
   mutate(ever_unsuppressed_after_artstart = max(detectable_vl, na.rm = T),
          `Study Number` = paste(`SUBJECT ID (CHAR)`, `STUDY VISIT (NUM)`, sep = '-')
          ) %>% #28 people with detectable VL after ART start
-  right_join(pt_samples, by = 'Study Number')
+  right_join(pt_samples, by = 'Study Number') %>%
+  filter(samples_exist==1)
 
 m=final_dataset%>%dplyr::select(`SUBJECT ID (CHAR)`, `PlACD Vol`, `PlACD  Vials` , vl, `missing vl`) %>% mutate(`missing plasma` = ifelse((`PlACD Vol`!='N/A' | `PlACD  Vials` != 'N/A') & is.na(vl), 1,0))
 table(m$`missing plasma`)
