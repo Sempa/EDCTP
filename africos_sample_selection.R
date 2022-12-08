@@ -67,9 +67,12 @@ write.csv(x_data, 'data/ever_unsuppressed.csv')
 history_deteable_vl <- read.csv('data/ever_unsuppressed_edited.csv')
 samples_to_be_test <- history_deteable_vl %>%
   filter(!is.na(visit_to.selct_from)) %>%
-  dplyr::select(PlACD.Vol, PlACD..Vials, PLEDTA.Vol, PLEDTA..Vials, SUBJECT.ID..CHAR.,
-                Visit.Date, STUDY.VISIT..NUM., NUMERIC.DATE.FOR.art_sdt, 
-                Duration.of.started.ART..years., HIV.status.at.visit,
-                Viral.Load.Sample.Draw.Period, Viral.Load.Result.Prefix, VL.Copies.mL, vl)
-
-  mutate(sample_id = paste(`SUBJECT ID (CHAR)`, visit_to.selct_from, sep = '-'))
+  dplyr::select(`PlACD Vol` = PlACD.Vol, `PlACD Vials` = PlACD..Vials, `PLEDTA.Vol` = PLEDTA.Vol, 
+                `PLEDTA Vials` = PLEDTA..Vials, `SUBJECT ID` = SUBJECT.ID..CHAR.,
+                `Visit Date` = Visit.Date, `STUDY VISIT NUM` = STUDY.VISIT..NUM., 
+                `NUMERIC DATE FOR art_sdt` = NUMERIC.DATE.FOR.art_sdt, 
+                `Duration of started ART years` = Duration.of.started.ART..years., 
+                `HIV status at visit` = HIV.status.at.visit,
+                `Viral Load Sample Draw Period` = Viral.Load.Sample.Draw.Period, 
+                `Viral Load Result Prefix` = Viral.Load.Result.Prefix, `VL Copies mL` = VL.Copies.mL, vl)
+write.csv(samples_to_be_test, 'data/List of samples to test.csv')
