@@ -9,7 +9,16 @@ library(splines)
 library(cowplot)
 library(distributions3)
 
-pt_dataset <- read_excel("data/rv329_sacema_12sep22_Plasma Inventory[3].xlsx", sheet = "Request")[,-c(19:21)]
+pt_dataset <- read_excel("data/rv329_sacema_12sep22_Plasma Inventory[3].xlsx", sheet = "Request")[,-c(19:21)] %>%
+  # mutate(id_visit = paste(`SUBJECT ID (CHAR)`, `STUDY VISIT (NUM)`, sep = '-')) %>%
+  filter(!(`SUBJECT ID (CHAR)` == 'A01-0008' & `STUDY VISIT (NUM)` == 18 & `VL Copies/mL` == 50 & vl == 25)) %>%
+  filter(!(`SUBJECT ID (CHAR)` == 'A01-0017' & `STUDY VISIT (NUM)` == 17 & `VL Copies/mL` == 1740 & vl == 1740)) %>%
+  filter(!(`SUBJECT ID (CHAR)` == 'A01-0152' & `STUDY VISIT (NUM)` == 15 & `VL Copies/mL` == 50 & vl == 25)) %>%
+  filter(!(`SUBJECT ID (CHAR)` == 'A01-0204' & `STUDY VISIT (NUM)` == 14 & is.na(`VL Copies/mL`) & vl == 1)) %>%
+  filter(!(`SUBJECT ID (CHAR)` == 'A01-0224' & `STUDY VISIT (NUM)` == 15 & is.na(`VL Copies/mL`) & vl == 1)) %>%
+  filter(!(`SUBJECT ID (CHAR)` == 'A01-0225' & `STUDY VISIT (NUM)` == 14 & `VL Copies/mL` == 88 & vl == 88)) %>%
+  filter(!(`SUBJECT ID (CHAR)` == 'A01-0226' & `STUDY VISIT (NUM)` == 13 & `VL Copies/mL` == 102 & vl == 102)) %>%
+  mutate(`STUDY VISIT (NUM)` == ifelse((`STUDY VISIT (NUM)` == 'A01-0020' & `VL Copies/mL` == 2116 & vl == 2116), 3, `STUDY VISIT (NUM)`))
 pt_samples <- read_excel("data/rv329_sacema_12sep22_Plasma Inventory[3].xlsx", sheet = "Sheet1")[-c(1:3),] %>%
   arrange(`Study Number`) %>%
   mutate(Uganda = grepl('A', `Study Number`),
@@ -45,13 +54,22 @@ final_dataset <- pt_dataset %>%
   right_join(pt_samples, by = 'Study Number') %>%
   filter(samples_exist==1)
 
-m=final_dataset%>%dplyr::select(`SUBJECT ID (CHAR)`, `PlACD Vol`, `PlACD  Vials` , vl, `missing vl`) %>% mutate(`missing plasma` = ifelse((`PlACD Vol`!='N/A' | `PlACD  Vials` != 'N/A') & is.na(vl), 1,0))
-table(m$`missing plasma`)
-x=final_dataset%>%
-   filter(ever_unsuppressed_after_artstart == 1) #%>%
-length(unique((final_dataset%>% mutate(country = grepl('A', `SUBJECT ID (CHAR)`)) %>% filter(country ==T & ever_unsuppressed_after_artstart==1))$`SUBJECT ID (CHAR)`))
+# m=final_dataset%>%dplyr::select(`SUBJECT ID (CHAR)`, `PlACD Vol`, `PlACD  Vials` , vl, `missing vl`) %>% mutate(`missing plasma` = ifelse((`PlACD Vol`!='N/A' | `PlACD  Vials` != 'N/A') & is.na(vl), 1,0))
+# table(m$`missing plasma`)
+# x=final_dataset%>%
+#    filter(ever_unsuppressed_after_artstart == 1) #%>%
+# length(unique((final_dataset%>% mutate(country = grepl('A', `SUBJECT ID (CHAR)`)) %>% filter(country ==T & ever_unsuppressed_after_artstart==1))$`SUBJECT ID (CHAR)`))
 x_data <- pt_dataset %>%
   filter(`SUBJECT ID (CHAR)` %in% unique((final_dataset%>% 
                                             mutate(country = grepl('A', `SUBJECT ID (CHAR)`)) %>% 
                                             filter(ever_unsuppressed_after_artstart==1))$`SUBJECT ID (CHAR)`))
 write.csv(x_data, 'data/ever_unsuppressed.csv')
+history_deteable_vl <- read.csv('data/ever_unsuppressed_edited.csv')
+samples_to_be_test <- history_deteable_vl %>%
+  filter(!is.na(visit_to.selct_from)) %>%
+  dplyr::select(PlACD.Vol, PlACD..Vials, PLEDTA.Vol, PLEDTA..Vials, SUBJECT.ID..CHAR.,
+                Visit.Date, STUDY.VISIT..NUM., NUMERIC.DATE.FOR.art_sdt, 
+                Duration.of.started.ART..years., HIV.status.at.visit,
+                Viral.Load.Sample.Draw.Period, Viral.Load.Result.Prefix, VL.Copies.mL, vl)
+
+  mutate(sample_id = paste(`SUBJECT ID (CHAR)`, visit_to.selct_from, sep = '-'))
