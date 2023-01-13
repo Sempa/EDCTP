@@ -126,7 +126,7 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
       ggtitle(paste("Sedia ODn vs EDDI_", threshold))
   )
   dev.off()
-browser()
+# browser()
   model_data <- data.frame(
     id = NA, interceptlink_identity = NA, slope_link_identity = NA,
     intercept_link_log = NA, slope_link_log = NA
@@ -178,7 +178,9 @@ browser()
   lines(dx, lwd = 3, col = "red")
   
   dev.off()
-
+  
+  write_rds(model_data, 'data/model_data.rds')
+  
   return(
     cbind(
       suppression = threshold,
@@ -220,6 +222,8 @@ for (i in c(100, 400, 1000)) {
   results <- rbind(results, x)
 }
 write.csv(results, "output_table/results_suppressed.csv") # results
+
+model_data <- read_rds('data/model_data.rds')
 
 ################################################################
 #' Analysis among early VL suppressed test straddling ART start
