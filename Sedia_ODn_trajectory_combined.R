@@ -222,8 +222,16 @@ for (i in c(100, 400, 1000)) {
   results <- rbind(results, x)
 }
 write.csv(results, "output_table/results_suppressed.csv") # results
-
-model_data <- read_rds('data/model_data.rds')
+set.seed(11);Z <- Normal(0, 1)
+model_data <- read_rds('data/model_data.rds') %>%
+  mutate(sigma_slope_identity = (sd(slope_link_identity)/(length(slope_link_identity) - 1))^0.5,
+         sigma_slope_log = (sd(slope_link_log)/(length(slope_link_log) - 1))^0.5) %>%
+  group_by(id) %>%
+  mutate(z_value_identity = (slope_link_identity - 0) / sigma_slope_identity,
+         `P values identity` = 1 - cdf(Z, abs(z_value_identity)) + cdf(Z, -abs(z_value_identity)),
+         z_value_log = (slope_link_log - 0) / sigma_slope_log,
+         `P values log` = 1 - cdf(Z, abs(z_value_log)) + cdf(Z, -abs(z_value_log))
+         )
 
 ################################################################
 #' Analysis among early VL suppressed test straddling ART start
