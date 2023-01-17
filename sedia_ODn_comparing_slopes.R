@@ -171,6 +171,7 @@ sedia_diffs_data_sorting <- data_sorting %>%
   filter(suprressed_throughout_followup_1000 == 1 | to_peak == 1 | to_trough == 1
   ) %>%
   filter(!is.na(sedia_slope)) %>%
+  arrange() %>%
   mutate(sedia_diff = sedia_ODn_2 - sedia_ODn)
 
 t.test((sedia_diffs_data_sorting %>%
