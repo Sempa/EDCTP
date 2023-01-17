@@ -541,35 +541,11 @@ slopes_for_unsuppressed <- function(ODn_vl_data, threshold) {
   # browser()
   jpeg(paste(folder_name, "/", "Figure_link_identity", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
   
-  hist(model_data$`slope link identity`, breaks = 30, freq = FALSE, ylab = '', xlab = 'Slopes of individuals', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
+  hist(model_data$`slope link identity`, breaks = 30, freq = FALSE, xlim = c(-0.02, 0.04), ylab = '', xlab = 'Slopes of individuals', main = '', col = 'black', cex.lab = 2, cex.axis = 2, xaxt="n") # , main = paste("Density plot link=identity_", threshold)
+  axis(1, at = seq(-0.02, 0.04, by = 0.02), labels = seq(-0.02, 0.04, by = 0.02), cex.lab = 2, cex.axis = 2)
   lines(dx, lwd = 3, col = "red")
-  
-  # print(
-  #   model_data %>%
-  #     mutate(slope_link_identity = as.numeric(slope_link_identity)) %>%
-  #     ggplot(aes(x = slope_link_identity)) +
-  #     geom_histogram(color = "#e9ecef", alpha = 0.6, bins = 30, position = "identity") +
-  #     scale_fill_manual(values = c("#69b3a2", "#404080")) +
-  #     labs(fill = "") +
-  #     geom_density(
-  #       lwd = 1.2,
-  #       linetype = 1,
-  #       colour = 2
-  #     ) +
-  #     theme(
-  #       text = element_text(size = 20),
-  #       plot.title = element_text(hjust = 0.5),
-  #       axis.line = element_line(colour = "black"),
-  #       axis.text = element_text(size = 18),
-  #       axis.title = element_text(size = 18),
-  #       panel.background = element_blank(),
-  #       panel.border = element_blank(),
-  #       plot.margin = unit(c(0, 0, 0, 0), "null"),
-  #       legend.position = "none"
-  #     ) +
-  #     ggtitle(paste("histogram mean slope link=identity_", threshold))
-  # )
   dev.off()
+  
   hist_plot2 <- hist(model_data$`slope link log`, breaks = 30, freq = FALSE, ylab = '', xlab = 'Individual slopes', main = paste("Mean slope link=identity_", threshold), col = 'black', cex.lab = 1.5, cex.axis = 1.5)
   area_hist2 <- sum(hist_plot2$counts* abs(hist_plot2$mids[1]-hist_plot2$mids[2]))
   n_values2 <- sum(hist_plot2$counts / area_hist2)
@@ -580,34 +556,9 @@ slopes_for_unsuppressed <- function(ODn_vl_data, threshold) {
   
   jpeg(paste(folder_name, "/", "Figure_link_log",threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 6, res = 300)
   
-  hist(model_data$`slope link log`, breaks = 30, freq = FALSE, ylab = '', xlab = 'Slopes of individuals', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
+  hist(model_data$`slope link log`, breaks = 30, freq = FALSE, xlim = c(-0.020, 0.040), ylab = '', xlab = 'Slopes of individuals', main = '', col = 'black', cex.lab = 2, cex.axis = 2, xaxt="n") # , main = paste("Density plot link=identity_", threshold)
+  axis(1, at = seq(-0.020, 0.040, by = 0.010), labels = seq(-0.020, 0.040, by = 0.010), cex.lab = 2, cex.axis = 2)
   lines(dx, lwd = 3, col = "red")
-  
-  # print(
-  #   model_data %>%
-  #     mutate(slope_link_log = as.numeric(slope_link_log)) %>%
-  #     ggplot(aes(x = slope_link_log)) +
-  #     geom_histogram(color = "#e9ecef", alpha = 0.6, bins = 30, position = "identity") +
-  #     scale_fill_manual(values = c("#69b3a2", "#404080")) +
-  #     labs(fill = "") +
-  #     geom_density(
-  #       lwd = 1.2,
-  #       linetype = 1,
-  #       colour = 2
-  #     ) +
-  #     theme(
-  #       text = element_text(size = 20),
-  #       plot.title = element_text(hjust = 0.5),
-  #       axis.line = element_line(colour = "black"),
-  #       axis.text = element_text(size = 18),
-  #       axis.title = element_text(size = 18),
-  #       panel.background = element_blank(),
-  #       panel.border = element_blank(),
-  #       plot.margin = unit(c(0, 0, 0, 0), "null"),
-  #       legend.position = "none"
-  #     ) +
-  #     ggtitle(paste("histogram mean slope link=log_", threshold))
-  # )
   dev.off()
 
   return(

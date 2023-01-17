@@ -18,7 +18,7 @@ data_intermitent_suppression_selected_visits <- read.csv("output_table/intermite
   filter(!is.na(to_peak) |!is.na(to_trough)) %>%
   mutate(id = paste(subject_label_blinded, days_since_eddi, sep = '_'),
          id_2 = id) %>%
-  select(id, to_peak, set_to_peak, to_trough, set_to_trough)
+  select(id, to_peak, set_to_peak, to_peak_first_visit, to_trough, set_to_trough, to_trough_first_visit)
 data_sorting <- sedia_generic %>%
   filter(visit_hivstatus == "P") %>%
   rename(sedia_ODn = result...72) %>%
@@ -64,7 +64,7 @@ data_sorting <- sedia_generic %>%
   select(
     subject_label_blinded, days_since_eddi, days_since_eddi_2, sedia_ODn, sedia_ODn_2, test_date, viral_load, viral_load_2,
     suprressed_throughout_followup_100, suprressed_throughout_followup_400, suprressed_throughout_followup_1000,
-    to_peak, set_to_peak, to_trough, set_to_trough
+    to_peak, set_to_peak, to_peak_first_visit, to_trough, set_to_trough, to_trough_first_visit
   ) %>%
   filter(days_since_eddi != days_since_eddi_2) %>%
   arrange(subject_label_blinded, days_since_eddi) %>%
@@ -181,9 +181,9 @@ t.test((sedia_diffs_data_sorting %>%
 t.test((sedia_diffs_data_sorting %>%
           filter(suprressed_throughout_followup_1000 == 1))$sedia_diff)
 t.test((sedia_diffs_data_sorting %>%
-         filter(to_peak == 1))$sedia_diff)
+         filter(to_peak_first_visit == 1))$sedia_diff)
 t.test((sedia_diffs_data_sorting %>%
-         filter(to_trough == 1))$sedia_diff)
+         filter(to_trough_first_visit == 1))$sedia_diff)
 
 dat <- sedia_diffs_data_sorting %>%
   filter(suprressed_throughout_followup_100 == 1)
@@ -193,10 +193,10 @@ n_values1 <- sum(hist_plot1$counts / area_hist1)
 set.seed(11)
 x <- rnorm(n_values1, mean = mean(dat$sedia_diff, na.rm = T), sd = sd(dat$sedia_diff))
 dx <- density(x)
-  jpeg('other_figures/Figure_less_100.jpeg', units = "in", width = 8, height = 6, res = 300)
-  hist(dat$sedia_diff, breaks = 30, freq = FALSE, ylab = '', xlab = 'Sedia LAg differences', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
-  lines(dx, lwd = 3, col = "red")
-  dev.off()
+jpeg('other_figures/Figure_less_100.jpeg', units = "in", width = 8, height = 6, res = 300)
+hist(dat$sedia_diff, breaks = 30, freq = FALSE, ylab = '', xlab = 'Sedia LAg differences', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
+lines(dx, lwd = 3, col = "red")
+dev.off()
   
 dat <- sedia_diffs_data_sorting %>%
   filter(suprressed_throughout_followup_400 == 1)
@@ -206,10 +206,10 @@ n_values2 <- sum(hist_plot2$counts / area_hist2)
 set.seed(11)
 x <- rnorm(n_values2, mean = mean(dat$sedia_diff, na.rm = T), sd = sd(dat$sedia_diff))
 dx <- density(x)
-  jpeg('other_figures/Figure_less_400.jpeg', units = "in", width = 8, height = 6, res = 300)
-  hist(dat$sedia_diff, breaks = 30, freq = FALSE, ylab = '', xlab = 'Sedia LAg differences', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
-  lines(dx, lwd = 3, col = "red")
-  dev.off()
+jpeg('other_figures/Figure_less_400.jpeg', units = "in", width = 8, height = 6, res = 300)
+hist(dat$sedia_diff, breaks = 30, freq = FALSE, ylab = '', xlab = 'Sedia LAg differences', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
+lines(dx, lwd = 3, col = "red")
+dev.off()
   
 dat <- sedia_diffs_data_sorting %>%
   filter(suprressed_throughout_followup_1000 == 1)
@@ -219,34 +219,34 @@ n_values3 <- sum(hist_plot3$counts / area_hist3)
 set.seed(11)
 x <- rnorm(n_values3, mean = mean(dat$sedia_diff, na.rm = T), sd = sd(dat$sedia_diff))
 dx <- density(x)
-  jpeg('other_figures/Figure_less_1000.jpeg', units = "in", width = 8, height = 6, res = 300)
-  hist(dat$sedia_diff, breaks = 30, freq = FALSE, ylab = '', xlab = 'Sedia LAg differences', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
-  lines(dx, lwd = 3, col = "red")
-  dev.off()
+jpeg('other_figures/Figure_less_1000.jpeg', units = "in", width = 8, height = 6, res = 300)
+hist(dat$sedia_diff, breaks = 30, freq = FALSE, xlim = c(-1, 2), ylab = '', xlab = 'Sedia LAg differences', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
+lines(dx, lwd = 3, col = "red")
+dev.off()
 
 dat <- sedia_diffs_data_sorting %>%
-  filter(to_peak == 1)
+  filter(to_peak_first_visit == 1)
 hist_plot4 <- hist(dat$sedia_diff, breaks = 30, freq = FALSE, ylab = '', xlab = 'Sedia LAg differences', main = '', col = 'black', cex.lab = 1.5, cex.axis = 1.5) # , main = paste("Mean slope link=identity_", threshold)
 area_hist4 <- sum(hist_plot4$counts* abs(hist_plot4$mids[1]-hist_plot4$mids[2]))
 n_values4 <- sum(hist_plot4$counts / area_hist4)
 set.seed(11)
 x <- rnorm(n_values4, mean = mean(dat$sedia_diff, na.rm = T), sd = sd(dat$sedia_diff))
 dx <- density(x)
-  jpeg('other_figures/Figure_to_peak.jpeg', units = "in", width = 8, height = 6, res = 300)
-  hist(dat$sedia_diff, breaks = 30, freq = FALSE, ylab = '', xlab = 'Sedia LAg differences', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
-  lines(dx, lwd = 3, col = "red")
-  dev.off()
+jpeg('other_figures/Figure_to_peak.jpeg', units = "in", width = 8, height = 6, res = 300)
+hist(dat$sedia_diff, breaks = 30, freq = FALSE, ylab = '', xlab = 'Sedia LAg differences', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
+lines(dx, lwd = 3, col = "red")
+dev.off()
   
 dat <- sedia_diffs_data_sorting %>%
-  filter(to_trough == 1)
+  filter(to_trough_first_visit == 1)
 hist_plot5 <- hist(dat$sedia_diff, breaks = 30, freq = FALSE, ylab = '', xlab = 'Sedia LAg differences', main = '', col = 'black', cex.lab = 1.5, cex.axis = 1.5) # , main = paste("Mean slope link=identity_", threshold)
 area_hist5 <- sum(hist_plot5$counts* abs(hist_plot5$mids[1]-hist_plot5$mids[2]))
 n_values5 <- sum(hist_plot5$counts / area_hist5)
 set.seed(11)
 x <- rnorm(n_values5, mean = mean(dat$sedia_diff, na.rm = T), sd = sd(dat$sedia_diff))
 dx <- density(x)
-  jpeg('other_figures/Figure_to_trough.jpeg', units = "in", width = 8, height = 6, res = 300)
-  hist(dat$sedia_diff, breaks = 30, freq = FALSE, ylab = '', xlab = 'Sedia LAg differences', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
-  lines(dx, lwd = 3, col = "red")
-  dev.off()
+jpeg('other_figures/Figure_to_trough.jpeg', units = "in", width = 8, height = 6, res = 300)
+hist(dat$sedia_diff, breaks = 30, freq = FALSE, ylab = '', xlab = 'Sedia LAg differences', main = '', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
+lines(dx, lwd = 3, col = "red")
+dev.off()
   
