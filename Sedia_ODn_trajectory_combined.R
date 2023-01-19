@@ -30,11 +30,14 @@ final_dataset <- read_csv("Sempa_final_pull_with_results.csv") %>%
          unsupressed_visits = ifelse(viral_load >999, 1,0)) %>%
   mutate(visits = ifelse(unsupressed_visits==1, visits, NA),
     baseline_visit = ifelse(unsupressed_visits==1, max(visits, na.rm = T), 0)) %>%
+  mutate(baseline_visit = ifelse((subject_label_blinded == 35329295 | subject_label_blinded == 52033420), 1, 
+                                 ifelse(subject_label_blinded == 54382839, 5, 
+                                        ifelse(subject_label_blinded == 64577680,13, baseline_visit)))) %>%
   mutate(baseline_visit = max(baseline_visit),
          visits = 1:length(subject_label_blinded)) %>%
   filter(visits >=baseline_visit) %>%
   filter(Group == 'early suppressions') %>%
-  select(subject_label_blinded, days_since_eddi, test_date, sedia_ODn, viral_load) 
+  select(subject_label_blinded, days_since_eddi, test_date, sedia_ODn, viral_load, visits, baseline_visit) 
 
 sedia_generic <- read_csv("data/20180410-EP-LAgSedia-Generic.csv") %>%
   mutate(sedia_ODn = `result...15`)
@@ -178,7 +181,7 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
   # lines(dx, lwd = 3, col = "red")
   # 
   # dev.off()
-  browser()
+  # browser()
   jpeg(paste(folder_name, "/", "Figure_combined", threshold, ".jpeg", sep = ""), units = "in", width = 15, height = 8, res = 300)
   
   par(mfrow = c(1, 2))#, pty = "s"
@@ -311,6 +314,7 @@ slopes_for_suppressed_straddling_ARTstart <- function(ODn_vl_data, threshold) {
     ) %>%
     filter(!is.na(days_since_eddi)) %>%
     select(subject_label_blinded, test_date, days_since_eddi, sedia_ODn, sedia_ODn_with_noise, viral_load)
+  # browser()
   counter <- 0
   for (i in 1:length(unique(dat$subject_label_blinded))) {
     counter <- counter + 1
@@ -556,16 +560,29 @@ slopes_for_unsuppressed <- function(ODn_vl_data, threshold) {
   # dev.off()
   
   #####
+  if (threshold == 'to_unsuppressed'){
   jpeg(paste(folder_name, "/", "Figure_link_combined", threshold, ".jpeg", sep = ""), units = "in", width = 15, height = 8, res = 300)
   par(mfrow = c(1, 2))
-  hist(model_data$`slope link identity`, breaks = 30, freq = FALSE, xlim = c(-0.02, 0.04), ylab = '', xlab = 'Slopes of individuals', main = 'A', col = 'black', cex.lab = 2, cex.axis = 2, xaxt="n") # , main = paste("Density plot link=identity_", threshold)
+  hist(model_data$`slope link identity`, breaks = 30, freq = FALSE, xlim = c(-0.02, 0.04), ylab = '', xlab = 'Slopes of individuals', main = 'A', col = 'black', cex.lab = 2, cex.axis = 2, xaxt="n", cex.main = 2) # , main = paste("Density plot link=identity_", threshold)
   axis(1, at = seq(-0.02, 0.04, by = 0.02), labels = seq(-0.02, 0.04, by = 0.02), cex.lab = 2, cex.axis = 2)
   lines(dx, lwd = 3, col = "red")
   
-  hist(model_data$`slope link log`, breaks = 30, freq = FALSE, xlim = c(-0.020, 0.040), ylab = '', xlab = 'Slopes of individuals', main = 'B', col = 'black', cex.lab = 2, cex.axis = 2, xaxt="n") # , main = paste("Density plot link=identity_", threshold)
+  hist(model_data$`slope link log`, breaks = 30, freq = FALSE, xlim = c(-0.020, 0.040), ylab = '', xlab = 'Slopes of individuals', main = 'B', col = 'black', cex.lab = 2, cex.axis = 2, xaxt="n", cex.main = 2) # , main = paste("Density plot link=identity_", threshold)
   axis(1, at = seq(-0.020, 0.040, by = 0.010), labels = seq(-0.020, 0.040, by = 0.010), cex.lab = 2, cex.axis = 2)
   lines(dx, lwd = 3, col = "red")
-  dev.off()
+  dev.off()}
+  
+  if (threshold == 'from_unsuppressed'){
+    jpeg(paste(folder_name, "/", "Figure_link_combined", threshold, ".jpeg", sep = ""), units = "in", width = 15, height = 8, res = 300)
+    par(mfrow = c(1, 2))
+    hist(model_data$`slope link identity`, breaks = 30, freq = FALSE, xlim = c(-0.03, 0.02), ylab = '', xlab = 'Slopes of individuals', main = 'A', col = 'black', cex.lab = 2, cex.axis = 2, xaxt="n", cex.main = 2) # , main = paste("Density plot link=identity_", threshold)
+    axis(1, at = seq(-0.03, 0.02, by = 0.01), labels = seq(-0.03, 0.02, by = 0.01), cex.lab = 2, cex.axis = 2)
+    lines(dx, lwd = 3, col = "red")
+    
+    hist(model_data$`slope link log`, breaks = 30, freq = FALSE, xlim = c(-0.040, 0.030), ylab = '', xlab = 'Slopes of individuals', main = 'B', col = 'black', cex.lab = 2, cex.axis = 2, xaxt="n", cex.main = 2) # , main = paste("Density plot link=identity_", threshold)
+    axis(1, at = seq(-0.040, 0.030, by = 0.010), labels = seq(-0.040, 0.030, by = 0.010), cex.lab = 2, cex.axis = 2)
+    lines(dx, lwd = 3, col = "red")
+    dev.off()}
 
   return(
     cbind(
