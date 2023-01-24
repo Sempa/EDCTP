@@ -250,15 +250,84 @@ jpeg('other_figures/Figure_combined_3.jpeg', units = "in", width = 15, height = 
 
 par(mfrow = c(2, 2))
 
-hist(dat1$sedia_diff, breaks = 30, freq = FALSE, xlim = c(-1, 2), ylab = '', xlab = 'Sedia LAg differences', main = 'A', col = 'black', cex.lab = 2, cex.axis = 2, cex.main = 2) # , main = paste("Density plot link=identity_", threshold)
-lines(dx1, lwd = 3, col = "red")
+hist(dat1$sedia_diff, breaks = 30, xlim = c(-1, 2), ylab = '', xlab = 'Sedia LAg differences', main = 'A', col = 'black', cex.lab = 2, cex.axis = 2, cex.main = 2) # , main = paste("Density plot link=identity_", threshold)
+# lines(dx1, lwd = 3, col = "red")
 
 
-hist(dat2$sedia_diff, breaks = 30, freq = FALSE, ylab = '', xlab = 'Sedia LAg differences', main = 'B', col = 'black', cex.lab = 2, cex.axis = 2, cex.main = 2) # , main = paste("Density plot link=identity_", threshold)
-lines(dx2, lwd = 3, col = "red")
+hist(dat2$sedia_diff, breaks = 30, ylab = '', xlab = 'Sedia LAg differences', main = 'B', col = 'black', cex.lab = 2, cex.axis = 2, cex.main = 2) # , main = paste("Density plot link=identity_", threshold)
+# lines(dx2, lwd = 3, col = "red")
 
-hist(dat3$sedia_diff, breaks = 30, freq = FALSE, ylab = '', xlab = 'Sedia LAg differences', main = 'C', col = 'black', cex.lab = 2, cex.axis = 2, cex.main = 2) # , main = paste("Density plot link=identity_", threshold)
-lines(dx3, lwd = 3, col = "red")
+hist(dat3$sedia_diff, breaks = 30, ylab = '', xlab = 'Sedia LAg differences', main = 'C', col = 'black', cex.lab = 2, cex.axis = 2, cex.main = 2) # , main = paste("Density plot link=identity_", threshold)
+# lines(dx3, lwd = 3, col = "red")
 
 dev.off()
-  
+
+jpeg('other_figures/Figure_combined_ggplot.jpeg', units = "in", width = 15, height = 13, res = 300)
+
+pl_1 <- ggplot(
+  data = dat1,
+  aes(x = sedia_diff)
+) + # as.factor(subject_label_blinded)
+  geom_histogram(color="black", fill="red", bins = 30, alpha = 0.9) +
+  scale_x_continuous(limits = c(-1, 2.5), breaks = seq(-1, 2, by = 1), expand = c(0, 0)) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  theme(
+    text = element_text(size = 20),
+    plot.title = element_text(hjust = 0.5),
+    axis.line = element_line(colour = "black"),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    panel.background = element_blank(),
+    panel.border = element_blank(),
+    plot.margin = unit(c(0, 0, 0, 0), "null"),
+    legend.position = "none"
+  ) +
+  ylab("Count") +
+  xlab("Sedia LAg ODn differences")
+
+pl_2 <- ggplot(
+  data = dat2,
+  aes(x = sedia_diff)
+) + # as.factor(subject_label_blinded)
+  geom_histogram(color="black", fill="red", bins = 30, alpha = 0.9) +
+  scale_x_continuous(limits = c(-3, 5), breaks = seq(-3, 4, by = 1), expand = c(0, 0)) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  theme(
+    text = element_text(size = 20),
+    plot.title = element_text(hjust = 0.5),
+    axis.line = element_line(colour = "black"),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    panel.background = element_blank(),
+    panel.border = element_blank(),
+    plot.margin = unit(c(0, 0, 0, 0), "null"),
+    legend.position = "none"
+  ) +
+  ylab("Count") +
+  xlab("Sedia LAg ODn differences")
+
+pl_3 <- ggplot(
+  data = dat3,
+  aes(x = sedia_diff)
+) + # as.factor(subject_label_blinded)
+  geom_histogram(color="black", fill="red", bins = 30, alpha = 0.9) +
+  scale_x_continuous(limits = c(-4, 3), breaks = seq(-4, 2, by = 1), expand = c(0, 0)) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  theme(
+    text = element_text(size = 20),
+    plot.title = element_text(hjust = 0.5),
+    axis.line = element_line(colour = "black"),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    panel.background = element_blank(),
+    panel.border = element_blank(),
+    plot.margin = unit(c(0, 0, 0, 0), "null"),
+    legend.position = "none"
+  ) +
+  ylab("Count") +
+  xlab("Sedia LAg ODn differences")
+ggpubr::ggarrange(pl_1, pl_2, pl_3,
+                  labels = c("A", "B", "C"),
+                  ncol = 2, nrow = 2,
+                  font.label = list(size = 20, color = "black"))
+dev.off()

@@ -181,15 +181,32 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
   # lines(dx, lwd = 3, col = "red")
   # 
   # dev.off()
-  # browser()
-  jpeg(paste(folder_name, "/", "Figure_combined", threshold, ".jpeg", sep = ""), units = "in", width = 15, height = 8, res = 300)
-  
-  par(mfrow = c(1, 2))#, pty = "s"
-  
-  hist(model_data$slope_link_identity, breaks = 30, freq = FALSE, ylab = '', xlab = 'Slopes of individuals', main = 'A', col = 'black', cex.lab = 2, cex.axis = 2) #, main = paste("Density plot link=identity_", threshold)
-  lines(dx, lwd = 3, col = "red")
-  hist(model_data$slope_link_log, breaks = 30, freq = FALSE, ylab = '', xlab = 'Slopes of individuals', main = 'B', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
-  lines(dx1, lwd = 3, col = "red")
+  browser()#
+  jpeg(paste(folder_name, "/", "Figure_combined", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 8, res = 300)
+  ggplot(
+    data = model_data,
+    aes(x = slope_link_identity)
+  ) + # as.factor(subject_label_blinded)
+    geom_histogram(color="black", fill="red", bins = 30, alpha = 0.9) +
+    scale_x_continuous(limits = c(-0.006, 0.008), breaks = seq(-0.006, 0.007, by = 0.002), expand = c(0, 0)) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+    theme(
+      text = element_text(size = 20),
+      plot.title = element_text(hjust = 0.5),
+      axis.line = element_line(colour = "black"),
+      axis.text = element_text(size = 18),
+      axis.title = element_text(size = 18),
+      panel.background = element_blank(),
+      panel.border = element_blank(),
+      plot.margin = unit(c(0, 0, 0, 0), "null"),
+      legend.position = "none"
+    ) +
+    ylab("Count") +
+    xlab("Slopes of individuals (ODn/Day)") 
+  # hist(model_data$slope_link_identity, breaks = 30, xlim = c(-0.010, 0.010), xaxt="n", ylab = 'Counts', xlab = 'Slopes of individuals', main = '', col = 'black', cex.lab = 2, cex.axis = 2) #, main = paste("Density plot link=identity_", threshold)
+  # axis(1, at = seq(-.010, .01, by = .02), labels = seq(-.010, .01,by = .02) )
+  # hist(model_data$slope_link_log, breaks = 30, ylab = 'Counts', xlab = 'Slopes of individuals', main = 'B', col = 'black', cex.lab = 2, cex.axis = 2) # , main = paste("Density plot link=identity_", threshold)
+  # lines(dx1, lwd = 3, col = "red")
   dev.off()
   
   # browser()
@@ -231,7 +248,7 @@ ODn_regression_function_supressed <- function(dat) {
 
 
 results <- c()
-for (i in c(100, 400, 1000)) {
+for (i in c(1000)) {# 100, 400, 
   x <- slopes_for_suppressed(ODn_vl_data = sedia_generic, threshold = i)
   results <- rbind(results, x)
 }
@@ -935,6 +952,14 @@ graph_results_suppressed2<-ggplot(results_suppressed2, aes(x=`P-value`)) +
 # graph_results_suppressed2
 jpeg('other_figures/compare_value_with_previous.jpeg', units = "in", width = 8, height = 6, res = 300)
 graph_results_suppressed2
+dev.off()
+
+jpeg('other_figures/p_value_distributions.jpeg', units = "in", width = 15, height = 13, res = 300)
+ggpubr::ggarrange(graph_results_suppressed2, graph_results_suppressed1, graph_compare_first_peak_value,
+          labels = c("A", "B", "C"),
+          ncol = 2, nrow = 2,
+          font.label = list(size = 20, color = "black")
+          )
 dev.off()
 
 accuracy_dataset <- data.frame(rbind(sensitivity_value, specificity_value)) %>%
