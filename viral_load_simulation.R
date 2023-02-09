@@ -15,18 +15,7 @@ func_patient_char_gen <- function(age, # mean sd
     bl_vl = 0,
     trt_outcome = 0,
     years_of_follow_up = 0#,
-    # prob_mortality = 0
-    # trt_outcome = list(
-    #   died = 0,
-    #   ltf = 0,
-    #   alive = 0
-    # )#,
-    # trt_failure = 0,
-    # viremia = 0,
-    # viremia_status  = list(
-    #   early_supp = 0,
-    #   delay_supp = 0,
-    #   
+       
     )
   # browser()
     # Step 2: generate results
@@ -54,3 +43,15 @@ for (i in 1:10) {
   # x=1
   # print(temp_list)
 }
+
+
+
+def <- defData(varname = "xbase", dist = "normal", formula = 20, variance = 3)
+def <- defData(def, varname = "nCount", dist = "noZeroPoisson", formula = 6)
+def <- defData(def, varname = "mInterval", dist = "gamma", formula = 30, variance = 0.01)
+def <- defData(def, varname = "vInterval", dist = "nonrandom", formula = 0.07)
+dt <- genData(200, def)
+dt[id %in% c(8, 121)]
+
+# https://cran.r-project.org/web/packages/simstudy/vignettes/longitudinal.html
+# https://www.google.com/search?q=simulating+longitudinal+data+in+r&rlz=1C1GCEB_enZA917ZA917&oq=simulating+longitudianl+data&aqs=chrome.1.69i57j0i13i512j0i22i30i625j0i22i30j0i390l4.14006j0j7&sourceid=chrome&ie=UTF-8
