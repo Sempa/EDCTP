@@ -19,6 +19,7 @@ pt_dataset <- read_excel("data/rv329_sacema_12sep22_Plasma Inventory[3].xlsx", s
   filter(!(`SUBJECT ID (CHAR)` == 'A01-0225' & `STUDY VISIT (NUM)` == 14 & `VL Copies/mL` == 88 & vl == 88)) %>%
   filter(!(`SUBJECT ID (CHAR)` == 'A01-0226' & `STUDY VISIT (NUM)` == 13 & `VL Copies/mL` == 102 & vl == 102)) %>%
   mutate(`STUDY VISIT (NUM)` == ifelse((`STUDY VISIT (NUM)` == 'A01-0020' & `VL Copies/mL` == 2116 & vl == 2116), 3, `STUDY VISIT (NUM)`))
+write_rds(pt_dataset, 'data/africos_cohort.rds')
 pt_samples <- read_excel("data/rv329_sacema_12sep22_Plasma Inventory[3].xlsx", sheet = "Sheet1")[-c(1:3),] %>%
   arrange(`Study Number`) %>%
   mutate(Uganda = grepl('A', `Study Number`),

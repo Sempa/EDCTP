@@ -44,14 +44,58 @@ for (i in 1:10) {
   # print(temp_list)
 }
 
+library(simstudy)
+pt_dataset <- readRDS('data/africos_cohort.rds') # data edited from the AFRICOS_sample selection.R
 
+# set.seed(11)
+m <- .31; f <- .69 # Yapa et al. 2022
+min_base_vl <- 5e3; max_base_vl <- 1e6
+mean_cd4 <- 389.5 # Yapa et al. 2022
+#Set preliminary values
+l     <- 381.8;
+u     <- 389.5;
+n     <- 397.1;
+alpha <- 0.05;
+#Compute sample mean and SD
+crit <- qt(alpha/2, df = n-1, lower.tail = FALSE);
+mean_cd4 <- (l+u)/2;
+SD_cd4   <- (u-l)*sqrt(n)/(2*crit)
+vl_model1 <- nlme::lme(
+  fixed = logvl ~ bs(time_t, 3),
+  random = ~ 1 | id,
+  data = pt_dataset %>%
+    filter(!is.na(`VL Copies/mL`)) %>%
+    mutate(logvl = log(`VL Copies/mL`, 10),
+           time_t = `Duration of started ART (years)`,
+           id = `SUBJECT ID (CHAR)`),
+  na.action = na.exclude, control = lmeControl(opt = "optim")
+)
+b0 <- coef(summary(vl_model1))[[1]]
+b1 <- coef(summary(vl_model1))[[2]]
+b2 <- coef(summary(vl_model1))[[3]]
+b3 <- coef(summary(vl_model1))[[4]]
+m_var <- as.numeric(VarCorr(vl_model1)[[2]])
 
-def <- defData(varname = "xbase", dist = "normal", formula = 20, variance = 3)
-def <- defData(def, varname = "nCount", dist = "noZeroPoisson", formula = 6)
-def <- defData(def, varname = "mInterval", dist = "gamma", formula = 30, variance = 0.01)
-def <- defData(def, varname = "vInterval", dist = "nonrandom", formula = 0.07)
+def <- defData(varname = "base_age", dist = "normal", formula = 26, variance = 7)
+def <- defData(def,varname = "sex", dist = "categorical", formula = 'm;f')
+def <- defData(def, varname = "base_CD4", dist = "normal", formula = mean_cd4, variance = SD_cd4)
+def <- defData(def, varname = "base_vl", dist = "uniform", formula = 'min_base_vl;max_base_vl')
+def <- defData(def, varname = "nCount", dist = "noZeroPoisson", formula = 6) # nCount defines the number of measurements for an individual
+def <- defData(def, varname = "mInterval", dist = "gamma", formula = 3, variance = 1e-4) # mInterval specifies the average time between intervals for a subject (in quarters)
+def <- defData(def, varname = "vInterval", dist = "nonrandom", formula = 1e-3) # vInterval specifies the variance of those interval times. If vInterval is set to 0 or is not defined, the interval for a subject is determined entirely by the mean interval.
+set.seed(11)
 dt <- genData(200, def)
-dt[id %in% c(8, 121)]
+# dt[id %in% c(8, 121)]
+# The resulting longitudinal data for these two subjects can be inspected after 
+# a call to addPeriods. Notice that no parameters need to be set since all information 
+# resides in the data set itself:
+dtPeriod <- addPeriods(dt) %>%
+  mutate(time = time/4)
+# dtPeriod[id %in% c(8, 121)]
+# If a time-sensitive measurement is added to the data set …
+def2 <- defDataAdd(varname = "vl", dist = "normal", formula = '..b0 + ..b1 * time + ..b2 * time + ..b3 * time', variance = m_var)
+dtPeriod <- addColumns(def2, dtPeriod)
+
 
 # https://cran.r-project.org/web/packages/simstudy/vignettes/longitudinal.html
 # https://www.google.com/search?q=simulating+longitudinal+data+in+r&rlz=1C1GCEB_enZA917ZA917&oq=simulating+longitudianl+data&aqs=chrome.1.69i57j0i13i512j0i22i30i625j0i22i30j0i390l4.14006j0j7&sourceid=chrome&ie=UTF-8
