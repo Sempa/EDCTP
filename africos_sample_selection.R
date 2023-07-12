@@ -77,3 +77,17 @@ samples_to_be_test <- history_deteable_vl %>%
                 `Viral Load Sample Draw Period` = Viral.Load.Sample.Draw.Period, 
                 `Viral Load Result Prefix` = Viral.Load.Result.Prefix, `VL Copies mL` = VL.Copies.mL, vl)
 write.csv(samples_to_be_test, 'data/List of samples to test.csv')
+
+## Creating the final list of samples supplied with at least two visits
+shipped_speciemens <- read_excel("data/SHIPPING MANIFEST-IDI EDTA Plasma samples.xlsx") %>%
+  arrange(`Study Number`, `Date Collected`) %>%
+  mutate(id_new = paste(`Date Collected`,	`Freezerworks ID`, `Study Number`, sep = '')) %>%
+  distinct(id_new,.keep_all = T) %>%
+  group_by(`Study Number`) %>%
+  mutate(visits = length(id_new)) %>%
+  ungroup() %>%
+  group_by(`Study Number`) %>%
+  mutate(n_vists = max(visits)) %>%
+  arrange(Position) %>%
+  dplyr::select(-id_new, -n_vists, -visits)
+write.csv(shipped_speciemens, "data/EDITTED SHIPPING MANIFEST-IDI EDTA Plasma samples.csv")

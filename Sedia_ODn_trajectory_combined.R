@@ -83,7 +83,7 @@ sedia_generic <- sedia_generic %>%
 ######################################################
 
 slopes_for_suppressed <- function(ODn_vl_data, threshold) {
-  # browser()
+  browser()
   dir.create(paste("supp_", threshold, Sys.Date(), sep = "_"))
   folder_name <- paste("supp_", threshold, Sys.Date(), sep = "_")
   data_generated <- ODn_vl_data %>%
