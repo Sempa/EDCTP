@@ -83,7 +83,7 @@ sedia_generic <- sedia_generic %>%
 ######################################################
 
 slopes_for_suppressed <- function(ODn_vl_data, threshold) {
-  browser()
+  # browser()
   dir.create(paste("supp_", threshold, Sys.Date(), sep = "_"))
   folder_name <- paste("supp_", threshold, Sys.Date(), sep = "_")
   data_generated <- ODn_vl_data %>%
@@ -181,7 +181,7 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
   # lines(dx, lwd = 3, col = "red")
   # 
   # dev.off()
-  browser()#
+  # browser()#
   jpeg(paste(folder_name, "/", "Figure_combined", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 8, res = 300)
   ggplot(
     data = model_data,
@@ -475,6 +475,9 @@ data_intermitent_suppression <- read_csv("data/20180410-EP-LAgSedia-Generic.csv"
 #' patients peaking?
 # write.csv(data_intermitent_suppression, "output_table/intermitent_suppression.csv")
 data_intermitent_suppression_selected_visits <- read.csv("output_table/intermitent_suppression_selected.csv") %>%
+  mutate(Cohort = 'CEPHIA') %>%
+  bind_rows(read.csv('data/africos_data_with_ODn.csv') %>%
+              mutate(Cohort = 'AFRICOS')) %>%
   mutate(all_visits_to_peak = ifelse(subject_label_blinded == 28848447, NA, all_visits_to_peak))
 data_intermitent_suppression_toPeak_visits <- data_intermitent_suppression_selected_visits %>%
   filter(!is.na(to_peak)) %>%
@@ -600,7 +603,9 @@ slopes_for_unsuppressed <- function(ODn_vl_data, threshold) {
     axis(1, at = seq(-0.040, 0.030, by = 0.010), labels = seq(-0.040, 0.030, by = 0.010), cex.lab = 2, cex.axis = 2)
     lines(dx, lwd = 3, col = "red")
     dev.off()}
-
+  
+  if(threshold =='to_unsuppressed'){ write_rds(model_data, 'data/model_data_from_suppressed.rds')}
+  write_rds(model_data, 'data/model_data_to_suppressed.rds')
   return(
     cbind(
       suppression = threshold,
@@ -954,12 +959,19 @@ jpeg('other_figures/compare_value_with_previous.jpeg', units = "in", width = 8, 
 graph_results_suppressed2
 dev.off()
 
-jpeg('other_figures/p_value_distributions.jpeg', units = "in", width = 15, height = 13, res = 300)
+# jpeg('other_figures/p_value_distributions.jpeg', units = "in", width = 15, height = 13, res = 300)
+# ggpubr::ggarrange(graph_results_suppressed2, graph_results_suppressed1, graph_compare_first_peak_value,
+#           labels = c("A", "B", "C"),
+#           ncol = 2, nrow = 2,
+#           font.label = list(size = 20, color = "black")
+#           )
+# dev.off()
+jpeg('other_figures/report_figures_3.jpeg', units = "in", width = 15, height = 13, res = 300)
 ggpubr::ggarrange(graph_results_suppressed2, graph_results_suppressed1, graph_compare_first_peak_value,
-          labels = c("A", "B", "C"),
-          ncol = 2, nrow = 2,
-          font.label = list(size = 20, color = "black")
-          )
+                  labels = c("A", "B", "C"),
+                  ncol = 2, nrow = 2,
+                  font.label = list(size = 20, color = "black")
+)
 dev.off()
 
 accuracy_dataset <- data.frame(rbind(sensitivity_value, specificity_value)) %>%
@@ -1030,6 +1042,9 @@ accuracy_graph <- data.frame(accuracy_dataset) %>%
     # axis.text.x = element_text(angle = 60, hjust = 1)
   )
 # accuracy_graph
-jpeg('other_figures/accuracy_linegraph.jpeg', units = "in", width = 8, height = 6, res = 300)
+# jpeg('other_figures/accuracy_linegraph.jpeg', units = "in", width = 8, height = 6, res = 300)
+# accuracy_graph
+# dev.off()
+jpeg('other_figures/report_figure4.jpeg', units = "in", width = 8, height = 6, res = 300)
 accuracy_graph
 dev.off()

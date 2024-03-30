@@ -12,8 +12,7 @@ library(cowplot)
 #############################################
 #' Estimating Sedia LAg Measurement noise
 #############################################
-sedia_generic <- read_csv("data/20180410-EP-LAgSedia-Generic.csv")# %>%
-  # mutate(sedia_ODn = `result...15`)
+sedia_generic <- read_csv("data/20180410-EP-LAgSedia-Generic.csv")
 data_intermitent_suppression_selected_visits <- read.csv("output_table/intermitent_suppression_selected.csv") %>%
   filter(!is.na(to_peak) |!is.na(to_trough)) %>%
   mutate(id = paste(subject_label_blinded, days_since_eddi, sep = '_'),
@@ -75,7 +74,13 @@ data_sorting <- sedia_generic %>%
                                                       )
                                                )
          ) %>%
-  mutate(sedia_slope = ifelse(flag_viralload_detectablity2 != 'NA', (sedia_ODn_2 - sedia_ODn)/(days_since_eddi_2 - days_since_eddi)), NA)
+  mutate(sedia_slope = ifelse(flag_viralload_detectablity2 != 'NA', (sedia_ODn_2 - sedia_ODn)/(days_since_eddi_2 - days_since_eddi)), NA) %>%
+  mutate(Cohort = 'CEPHIA') %>%
+  bind_rows(read.csv('data/africos_data_with_ODn.csv') %>%
+              mutate(test_date = as.Date(test_date, "%d/%m/%Y"),
+                     sedia_ODn_diff = c(diff(sedia_ODn), 0),
+                     sedia_ODn_2 = sedia_ODn + sedia_ODn_diff,
+                     Cohort = 'AFRICOS'))
 
 accuracy_function_all <- function(dat, threshold){
 sedia_slope_data <- dat %>%
@@ -185,6 +190,8 @@ t.test((sedia_diffs_data_sorting %>%
 t.test((sedia_diffs_data_sorting %>%
          filter(to_trough_first_visit == 1))$sedia_diff)
 
+write_rds(sedia_diffs_data_sorting, 'data/data_for_differences.rds')
+
 dat <- sedia_diffs_data_sorting %>%
   filter(suprressed_throughout_followup_100 == 1)
 hist_plot1 <- hist(dat$sedia_diff, breaks = 30, freq = FALSE, ylab = '', xlab = 'Sedia LAg differences', main = '', col = 'black', cex.lab = 1.5, cex.axis = 1.5) # , main = paste("Mean slope link=identity_", threshold)
@@ -262,7 +269,8 @@ hist(dat3$sedia_diff, breaks = 30, ylab = '', xlab = 'Sedia LAg differences', ma
 
 dev.off()
 
-jpeg('other_figures/Figure_combined_ggplot.jpeg', units = "in", width = 15, height = 13, res = 300)
+# jpeg('other_figures/Figure_combined_ggplot.jpeg', units = "in", width = 15, height = 13, res = 300)
+jpeg('other_figures/report_figure_2.jpeg', units = "in", width = 15, height = 13, res = 300)
 
 pl_1 <- ggplot(
   data = dat1,
