@@ -90,6 +90,7 @@ dt08 <- dt07 %>%
                 group_vl_before_detect, vl_after_detect, to_detect, group_to_detect, 
                 to_undetect, group_to_undetect, visit_date.y, visit_date_new, ODn = ODn_,
                 exclude, comment)
+write.csv(dt08, 'data/full_africos_data_with_ODn.csv')
 dt09 <- dt08 %>%
   filter(is.na(exclude)) %>% # removing IDs/records where plasma samples were unavailable for testing.
   filter(vl_before_detect == 1) %>%
