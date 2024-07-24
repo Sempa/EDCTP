@@ -422,7 +422,7 @@ slopes_for_suppressed <- function(ODn_vl_data, threshold) {
   x <- rnorm(n_values1, mean = mean(model_data$slope_link_identity, na.rm = T), sd = sd(model_data$slope_link_identity))
   dx <- density(x)
 
-  browser() #
+  # browser() #
   jpeg(paste(folder_name, "/", "Figure_combined_b4_art", threshold, ".jpeg", sep = ""), units = "in", width = 8, height = 8, res = 300)
   slope_figure_1000 <- ggplot(
     data = model_data,
