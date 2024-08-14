@@ -146,7 +146,7 @@ poly_model <- nlme::lme(sedia_ODn ~ poly(days_since_eddi, 2),
                   random = ~days_since_eddi|subject_label_blinded,
                   na.action = na.omit)
 summary(poly_model)
-summary(poly_model)$tTable[,2]
+summary(poly_model)$tTable[,2][[1]]
 sd_fixed <- c(summary(poly_model)$tTable[,2][[1]], 
               summary(poly_model)$tTable[,2][[2]],
               summary(poly_model)$tTable[,2][[3]]) * sqrt(length(full_dataset$days_since_eddi))
@@ -173,9 +173,9 @@ baselines <- rnorm(n_individuals, mean = baseline_mean, sd = baseline_sd)
 # Define a two-degree polynomial to generate decay parameters
 generate_decay_rate <- function(t) {
   # Two-degree polynomial: a*t^2 + b*t + c
-  a <- 1.818730
-  b <- -8.97018
-  c <- 3.254208
+  a <- rnorm(n_individuals, mean = baseline_mean, sd = baseline_sd)#1.818730
+  b <- #-8.97018
+  c <- #3.254208
   decay_rate <- a * t^2 + b * t + c
   return(pmax(decay_rate, 0))  # Ensure decay rates are non-negative
 }
@@ -200,6 +200,64 @@ decay_data <- data.frame(time = rep(time_points, n_individuals),
 ggplot(decay_data, aes(x = time, y = value, group = individual)) +
   geom_line(alpha = 0.5) +
   labs(title = "Exponential Decay Curves for Individuals with Noise",
+       x = "Time (years)",
+       y = "ODn Value") +
+  theme_minimal()
+
+#################################################################################
+####individual decay rates
+# Load necessary libraries
+library(ggplot2)
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Number of individuals
+n_individuals <- 100
+
+# Time points (6-month intervals over 10 years)
+time_points <- seq(0, 10, by = 0.5)
+
+# Define the distributions for baseline
+baseline_mean <- 3.47
+baseline_sd <- 1.55
+baselines <- rnorm(n_individuals, mean = baseline_mean, sd = baseline_sd)
+
+# Define a two-degree polynomial to generate decay parameters
+generate_decay_rate <- function(t) {
+  # browser()
+  # Two-degree polynomial: a*t^2 + b*t + c
+  a <- rnorm(1, mean = summary(poly_model)$tTable[,1][[3]], 
+             sd = summary(poly_model)$tTable[,2][[3]] * sqrt(length(full_dataset$days_since_eddi)))#1.818730
+  b <- rnorm(1, mean = summary(poly_model)$tTable[,1][[2]], 
+             sd = summary(poly_model)$tTable[,2][[2]] * sqrt(length(full_dataset$days_since_eddi)))#-8.97018
+  c <- rnorm(1, mean = summary(poly_model)$tTable[,1][[1]], 
+             sd = summary(poly_model)$tTable[,2][[1]] * sqrt(length(full_dataset$days_since_eddi)))#3.254208
+  decay_rate <- a * t^2 + b * t + c
+  return(pmax(decay_rate, 0))  # Ensure decay rates are non-negative
+}
+
+# Generate decay rates for each individual
+decay_rates <- sapply(1:n_individuals, function(i) {
+  generate_decay_rate(time_points)  # Each individual has a unique decay rate
+})
+
+# Define the exponential decay function
+exp_decay <- function(t, baseline, decay_rate) {
+  pmax(baseline * exp(-decay_rate * t), 0)  # Ensure positive ODn values
+}
+
+# Generate decay data for each individual
+decay_data <- data.frame(time = rep(time_points, n_individuals),
+                         individual = rep(1:n_individuals, each = length(time_points)),
+                         value = unlist(lapply(1:n_individuals, function(i) {
+                           exp_decay(time_points, baselines[i], decay_rates[i])
+                         })))
+
+# Plot the decay curves
+ggplot(decay_data, aes(x = time, y = value, group = individual)) +
+  geom_line(alpha = 0.5) +
+  labs(title = "Exponential Decay Curves for Individuals",
        x = "Time (years)",
        y = "ODn Value") +
   theme_minimal()
