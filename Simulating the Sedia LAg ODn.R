@@ -173,9 +173,9 @@ baselines <- rnorm(n_individuals, mean = baseline_mean, sd = baseline_sd)
 # Define a two-degree polynomial to generate decay parameters
 generate_decay_rate <- function(t) {
   # Two-degree polynomial: a*t^2 + b*t + c
-  a <- rnorm(n_individuals, mean = baseline_mean, sd = baseline_sd)#1.818730
-  b <- #-8.97018
-  c <- #3.254208
+  a <- 1.818730 #rnorm(n_individuals, mean = baseline_mean, sd = baseline_sd)
+  b <- -8.97018
+  c <- 3.254208
   decay_rate <- a * t^2 + b * t + c
   return(pmax(decay_rate, 0))  # Ensure decay rates are non-negative
 }
@@ -213,7 +213,7 @@ library(ggplot2)
 set.seed(123)
 
 # Number of individuals
-n_individuals <- 100
+n_individuals <- 1000
 
 # Time points (6-month intervals over 10 years)
 time_points <- seq(0, 10, by = 0.5)
@@ -239,12 +239,13 @@ generate_decay_rate <- function(t) {
 
 # Generate decay rates for each individual
 decay_rates <- sapply(1:n_individuals, function(i) {
-  generate_decay_rate(time_points)  # Each individual has a unique decay rate
+  # generate_decay_rate(time_points)  # Each individual has a unique decay rate
+  pmax(generate_decay_rate(time_points), .05)
 })
 
 # Define the exponential decay function
 exp_decay <- function(t, baseline, decay_rate) {
-  pmax(baseline * exp(-decay_rate * t), 0)  # Ensure positive ODn values
+  pmax(baseline * exp(-decay_rate * t), .02)  # Ensure positive ODn values
 }
 
 # Generate decay data for each individual
