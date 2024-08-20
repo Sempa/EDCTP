@@ -153,56 +153,56 @@ sd_fixed <- c(summary(poly_model)$tTable[,2][[1]],
 
 ## Simulating the Sedia LAg ODn
 
-# Load necessary libraries
-library(ggplot2)
-
-# Set seed for reproducibility
-set.seed(123)
-
-# Number of individuals
-n_individuals <- 100
-
-# Time points (6-month intervals over 10 years)
-time_points <- seq(0, 10, by = 0.5)
-
-# Define the distributions for baseline
-baseline_mean <- 3.47
-baseline_sd <- 1.55
-baselines <- rnorm(n_individuals, mean = baseline_mean, sd = baseline_sd)
-
-# Define a two-degree polynomial to generate decay parameters
-generate_decay_rate <- function(t) {
-  # Two-degree polynomial: a*t^2 + b*t + c
-  a <- 1.818730 #rnorm(n_individuals, mean = baseline_mean, sd = baseline_sd)
-  b <- -8.97018
-  c <- 3.254208
-  decay_rate <- a * t^2 + b * t + c
-  return(pmax(decay_rate, 0))  # Ensure decay rates are non-negative
-}
-
-# Generate decay rates for each time point
-decay_rates <- sapply(time_points, generate_decay_rate)
-
-# Define the exponential decay function with noise
-exp_decay_with_noise <- function(t, baseline, decay_rate, noise_sd = 0.1) {
-  noise <- rnorm(length(t), mean = 0, sd = noise_sd)
-  pmax((baseline * exp(-decay_rate * t)) + noise, 0)
-}
-
-# Generate decay data for each individual
-decay_data <- data.frame(time = rep(time_points, n_individuals),
-                         individual = rep(1:n_individuals, each = length(time_points)),
-                         value = unlist(lapply(1:n_individuals, function(i) {
-                           exp_decay_with_noise(time_points, baselines[i], decay_rates)
-                         })))
-
-# Plot the decay curves
-ggplot(decay_data, aes(x = time, y = value, group = individual)) +
-  geom_line(alpha = 0.5) +
-  labs(title = "Exponential Decay Curves for Individuals with Noise",
-       x = "Time (years)",
-       y = "ODn Value") +
-  theme_minimal()
+# # Load necessary libraries
+# library(ggplot2)
+# 
+# # Set seed for reproducibility
+# set.seed(123)
+# 
+# # Number of individuals
+# n_individuals <- 5000
+# 
+# # Time points (6-month intervals over 10 years)
+# time_points <- seq(0, 10, by = 0.5)
+# 
+# # Define the distributions for baseline
+# baseline_mean <- 3.47
+# baseline_sd <- 1.55
+# baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.001, b = 5)#rnorm(n_individuals, mean = baseline_mean, sd = baseline_sd)
+# 
+# # Define a two-degree polynomial to generate decay parameters
+# generate_decay_rate <- function(t) {
+#   # Two-degree polynomial: a*t^2 + b*t + c
+#   a <- 1.818730 #rnorm(n_individuals, mean = baseline_mean, sd = baseline_sd)
+#   b <- -8.97018
+#   c <- 3.254208
+#   decay_rate <- a * t^2 + b * t + c
+#   return(pmax(decay_rate, 0))  # Ensure decay rates are non-negative
+# }
+# 
+# # Generate decay rates for each time point
+# decay_rates <- sapply(time_points, generate_decay_rate)
+# 
+# # Define the exponential decay function with noise
+# exp_decay_with_noise <- function(t, baseline, decay_rate, noise_sd = 0.1) {
+#   noise <- rnorm(length(t), mean = 0, sd = noise_sd)
+#   pmax((baseline * exp(-decay_rate * t)) + noise, 0)
+# }
+# 
+# # Generate decay data for each individual
+# decay_data <- data.frame(time = rep(time_points, n_individuals),
+#                          individual = rep(1:n_individuals, each = length(time_points)),
+#                          value = unlist(lapply(1:n_individuals, function(i) {
+#                            exp_decay_with_noise(time_points, baselines[i], decay_rates)
+#                          })))
+# 
+# # Plot the decay curves
+# ggplot(decay_data, aes(x = time, y = value, group = individual)) +
+#   geom_line(alpha = 0.5) +
+#   labs(title = "Exponential Decay Curves for Individuals with Noise",
+#        x = "Time (years)",
+#        y = "ODn Value") +
+#   theme_minimal()
 
 #################################################################################
 ####individual decay rates
@@ -221,7 +221,7 @@ time_points <- seq(0, 10, by = 0.5)
 # Define the distributions for baseline
 baseline_mean <- 3.47
 baseline_sd <- 1.55
-baselines <- rnorm(n_individuals, mean = baseline_mean, sd = baseline_sd)
+baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.001, b = 5)
 
 # Define a two-degree polynomial to generate decay parameters
 generate_decay_rate <- function(t) {
@@ -245,7 +245,7 @@ decay_rates <- sapply(1:n_individuals, function(i) {
 
 # Define the exponential decay function
 exp_decay <- function(t, baseline, decay_rate) {
-  pmax(baseline * exp(-decay_rate * t), .02)  # Ensure positive ODn values
+  pmax(baseline * exp(-decay_rate * t), .001)  # Ensure positive ODn values
 }
 
 # Generate decay data for each individual
@@ -262,3 +262,17 @@ ggplot(decay_data, aes(x = time, y = value, group = individual)) +
        x = "Time (years)",
        y = "ODn Value") +
   theme_minimal()
+###sigma ODn
+sigma_ODn_func <- function(data_set){
+  dt <- data_set%>%
+    group_by(individual) %>%
+    summarise(n_length = n(),
+              sd_value = sd(value))%>%
+    mutate(numerator = ((n_length-1) * sd_value^2))
+  g_stddev <- sum(dt$numerator)
+  n_samples <- sum(dt$n_length)
+  sigma_ODn <- (g_stddev / (n_samples-length(dt$n_length)))^.5
+  
+  return(sigma_ODn)
+}
+sigma_ODn = sigma_ODn_func(data_set = decay_data)
