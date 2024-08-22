@@ -234,13 +234,12 @@ generate_decay_rate <- function(t) {
   c <- rnorm(1, mean = summary(poly_model)$tTable[,1][[1]], 
              sd = summary(poly_model)$tTable[,2][[1]] * sqrt(length(full_dataset$days_since_eddi)))#3.254208
   decay_rate <- a * t^2 + b * t + c
-  return(pmax(decay_rate, 0))  # Ensure decay rates are non-negative
+  return(c(pmax(decay_rate, 0.05), a, b, c))  # Ensure decay rates are non-negative
 }
 
 # Generate decay rates for each individual
 decay_rates <- sapply(1:n_individuals, function(i) {
-  # generate_decay_rate(time_points)  # Each individual has a unique decay rate
-  pmax(generate_decay_rate(time_points), .05)
+  generate_decay_rate(time_points)  # Each individual has a unique decay rate
 })
 
 # Define the exponential decay function
@@ -252,8 +251,12 @@ exp_decay <- function(t, baseline, decay_rate) {
 decay_data <- data.frame(time = rep(time_points, n_individuals),
                          individual = rep(1:n_individuals, each = length(time_points)),
                          value = unlist(lapply(1:n_individuals, function(i) {
-                           exp_decay(time_points, baselines[i], decay_rates[i])
+                           exp_decay(time_points, baselines[i], decay_rates[1:length(n_individuals), i])
                          })))
+model_parameters <- bind_cols(id = 1:n_individuals,
+  baseline = as.data.frame(baselines), 
+  remove_rownames(data.frame(t(data.frame(decay_rates[c(22,23,24),])))) %>%
+  dplyr::select(a = X1, b = X2, c = X3))
 
 # Plot the decay curves
 ggplot(decay_data, aes(x = time, y = value, group = individual)) +
@@ -262,17 +265,97 @@ ggplot(decay_data, aes(x = time, y = value, group = individual)) +
        x = "Time (years)",
        y = "ODn Value") +
   theme_minimal()
-###sigma ODn
-sigma_ODn_func <- function(data_set){
-  dt <- data_set%>%
-    group_by(individual) %>%
-    summarise(n_length = n(),
-              sd_value = sd(value))%>%
-    mutate(numerator = ((n_length-1) * sd_value^2))
-  g_stddev <- sum(dt$numerator)
-  n_samples <- sum(dt$n_length)
-  sigma_ODn <- (g_stddev / (n_samples-length(dt$n_length)))^.5
-  
-  return(sigma_ODn)
+
+###########################################################
+##getting data to use for testing - CEPHIA EDCTP data
+###########################################################
+pt_data <- read_csv("Sempa_final_pull_with_results.csv") %>%
+  mutate(vl = ifelse(`Viral Load at Draw` == "<40", "40", ifelse(`Viral Load at Draw` == "NULL", "", `Viral Load at Draw`))) %>%
+  mutate(
+    logvl = log(as.numeric(vl), 10),
+    time_on_trt = -1 * `days since tx start`,
+    sedia_ODn = `Sedia LAg Odn screen`,
+    RaceEthnicity = `Race/Ethnicity`,
+    viral_load = as.numeric(vl),
+    test_date = visit_date,
+    days_since_eddi = `Days from EDDI to draw`
+  ) %>%
+  arrange(subject_label_blinded, time_on_trt) %>%
+  group_by(subject_label_blinded) %>%
+  mutate(visits = 1:length(subject_label_blinded),
+         unsupressed_visits = ifelse(viral_load >999, 1,0)) %>%
+  mutate(visits = ifelse(unsupressed_visits==1, visits, NA),
+         baseline_visit = ifelse(unsupressed_visits==1, max(visits, na.rm = T), 0)) %>%
+  mutate(baseline_visit = ifelse((subject_label_blinded == 35329295 | subject_label_blinded == 52033420), 1, 
+                                 ifelse(subject_label_blinded == 54382839, 5, 
+                                        ifelse(subject_label_blinded == 64577680,13, baseline_visit)))) %>%
+  mutate(baseline_visit = max(baseline_visit),
+         visits = 1:length(subject_label_blinded)) %>%
+  filter(visits >=baseline_visit) %>%
+  filter(Group == 'early suppressions') %>%
+  select(subject_label_blinded, days_since_eddi, test_date, sedia_ODn, viral_load, visits, baseline_visit) 
+pt_data_1 <- pt_data %>%
+  mutate(years_since_eddi = days_since_eddi/365.25) %>%
+  dplyr::select(subject_label_blinded, years_since_eddi, sedia_ODn, viral_load) %>%
+  filter(subject_label_blinded == 18724513)
+head(pt_data_1, 10)
+
+test_data <- data.frame(bind_cols(time_vec = c(pt_data_1[6:8,2]), ODn_vec = c(pt_data_1[6:8,3])))
+
+best_model_choice <- function(test_data, param_sim_data) {
+  ODn_vec <- test_data$sedia_ODn
+  time_vec <- test_data$years_since_eddi
+  dt <- model_parameters
+  a <- model_parameters$a
+  b <- model_parameters$b
+  c <- model_parameters$c
+  for (i in 1:length(ODn_vec)) {
+    t <- time_vec[i]
+    dt[[paste0("square_error", i)]] <- (ODn_vec[i] - pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001))^2
+  }
+  dt1 <- dt[!is.infinite(rowSums(dt)),]
+  # stopifnot(length(dt1$baselines) == 0)
+  dt2 <- dt1 %>%
+    rowwise() %>%
+    mutate(mse = sum(c_across(starts_with("square_error")))/length(ODn_vec)) %>%
+    ungroup() %>%
+    mutate(min_slope = min(mse)) %>%
+    filter(mse == min(mse)) %>%
+    dplyr::select(id, baselines, a, b, c, mse)
+  return(dt2)
 }
-sigma_ODn = sigma_ODn_func(data_set = decay_data)
+best_model_choice(test_data = test_data, param_sim_data = model_parameters)
+###########################################################
+###sigma ODn
+############################################################
+controls_blinded_sedia <-  read_csv("data/20180410-EP-LAgSedia-Generic.csv") %>%
+  mutate(sedia_ODn = `result...15`) %>%
+  filter(visit_id %in% c(21773, 21783, 21785)) %>%
+  mutate(specimen = case_when(
+    visit_id == 21773 ~ "BC-1",
+    visit_id == 21783 ~ "BC-2",
+    visit_id == 21785 ~ "BC-3"
+  )) %>%
+  select(specimen, test_date,
+         specimen_blinded_label = specimen_label,
+         sedia_final_ODn = `result...15`,
+         sedia_final_ODn_method = method
+  )
+sedia_distribution_blinded_controls <- controls_blinded_sedia %>%
+  group_by(specimen) %>%
+  summarise(
+    `mean Sedia ODn` = round(mean(sedia_final_ODn), 3),
+    `sigma Sedia ODn` = round(sd(sedia_final_ODn), 3)
+  ) %>%
+  mutate(`sigma over mean ODn` = `sigma Sedia ODn` / `mean Sedia ODn`)
+
+sd_sedia_ODn_vs_ODn_bc <- sedia_distribution_blinded_controls %>%
+  ggplot(aes(x = `mean Sedia ODn`, y = `sigma Sedia ODn`)) +
+  geom_point() +
+  expand_limits(x = 0, y = 0) +
+  geom_smooth(method = lm, size = 1.5, se = FALSE)
+
+sd_sedia_ODn_vs_ODn_bc
+
+noise <- summary(glm(sd_Sedia_ODn ~ mean_Sedia_ODn, data = sedia_distribution_blinded_controls %>%
+                       mutate(sd_Sedia_ODn = `sigma Sedia ODn`, mean_Sedia_ODn = `mean Sedia ODn`)))
