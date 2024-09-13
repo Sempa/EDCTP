@@ -124,7 +124,8 @@ full_dataset <- bind_rows(
       `days since tx start`, Sex, Age,
       test_date, sedia_ODn, viral_load, visits, Group, cohort, to_peak
     )
-)
+)  %>%
+  mutate(days_since_tx_start = `days since tx start`)
 
 baseline_ODn_table <- full_dataset %>%
   group_by(subject_label_blinded) %>%
@@ -134,22 +135,22 @@ baseline_ODn_table <- full_dataset %>%
 mean(c(baseline_ODn_table$sedia_ODn, baseline_ODn_data$ODn)) ## baseline mean
 sd(c(baseline_ODn_table$sedia_ODn, baseline_ODn_data$ODn))
 
-summary(nlme::lme(sedia_ODn ~ days_since_eddi, 
+summary(nlme::lme(sedia_ODn ~ days_since_tx_start, 
                   data = full_dataset %>%
                     filter(Group == 'early suppressions'), 
-                  random = ~days_since_eddi|subject_label_blinded,
+                  random = ~days_since_tx_start|subject_label_blinded,
                   na.action = na.omit))
 
-poly_model <- nlme::lme(sedia_ODn ~ poly(days_since_eddi, 2), 
+poly_model <- nlme::lme(sedia_ODn ~ poly(days_since_tx_start, 2), 
                   data = full_dataset %>%
                     filter(Group == 'early suppressions'), 
-                  random = ~days_since_eddi|subject_label_blinded,
+                  random = ~days_since_tx_start|subject_label_blinded,
                   na.action = na.omit)
 summary(poly_model)
 summary(poly_model)$tTable[,2][[1]]
 sd_fixed <- c(summary(poly_model)$tTable[,2][[1]], 
               summary(poly_model)$tTable[,2][[2]],
-              summary(poly_model)$tTable[,2][[3]]) * sqrt(length(full_dataset$days_since_eddi))
+              summary(poly_model)$tTable[,2][[3]]) * sqrt(length(full_dataset$days_since_tx_start))
 
 ## Simulating the Sedia LAg ODn
 
@@ -228,11 +229,11 @@ generate_decay_rate <- function(t) {
   # browser()
   # Two-degree polynomial: a*t^2 + b*t + c
   a <- rnorm(1, mean = summary(poly_model)$tTable[,1][[3]], 
-             sd = summary(poly_model)$tTable[,2][[3]] * sqrt(length(full_dataset$days_since_eddi)))#1.818730
+             sd = summary(poly_model)$tTable[,2][[3]] * sqrt(length(full_dataset$days_since_tx_start)))#1.818730
   b <- rnorm(1, mean = summary(poly_model)$tTable[,1][[2]], 
-             sd = summary(poly_model)$tTable[,2][[2]] * sqrt(length(full_dataset$days_since_eddi)))#-8.97018
+             sd = summary(poly_model)$tTable[,2][[2]] * sqrt(length(full_dataset$days_since_tx_start)))#-8.97018
   c <- rnorm(1, mean = summary(poly_model)$tTable[,1][[1]], 
-             sd = summary(poly_model)$tTable[,2][[1]] * sqrt(length(full_dataset$days_since_eddi)))#3.254208
+             sd = summary(poly_model)$tTable[,2][[1]] * sqrt(length(full_dataset$days_since_tx_start)))#3.254208
   decay_rate <- a * t^2 + b * t + c
   return(c(pmax(decay_rate, 0.05), a, b, c))  # Ensure decay rates are non-negative
 }
@@ -262,7 +263,7 @@ model_parameters <- bind_cols(id = 1:n_individuals,
 ggplot(decay_data, aes(x = time, y = value, group = individual)) +
   geom_line(alpha = 0.5) +
   labs(title = "Exponential Decay Curves for Individuals",
-       x = "Time (years)",
+       x = "Time since ART start (years)",
        y = "ODn Value") +
   theme_minimal()
 
