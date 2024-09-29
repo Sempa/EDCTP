@@ -302,8 +302,10 @@ pt_data_1 <- pt_data %>%
 head(pt_data_1, 10)
 
 test_data <- data.frame(bind_cols(time_vec = c(pt_data_1[6:8,2]), ODn_vec = c(pt_data_1[6:8,3])))
-
+test_data <- data.frame(time_vec=c(383, 781, 907),#, 1109 
+                        ODn_vec = c(4.2600690, 3.6636771, 3.9360987)) #, 4.0426009
 best_model_choice <- function(test_data, param_sim_data) {
+  # browser()
   ODn_vec <- test_data$sedia_ODn
   time_vec <- test_data$years_since_eddi
   dt <- model_parameters
