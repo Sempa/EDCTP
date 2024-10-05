@@ -152,59 +152,6 @@ sd_fixed <- c(summary(poly_model)$tTable[,2][[1]],
               summary(poly_model)$tTable[,2][[2]],
               summary(poly_model)$tTable[,2][[3]]) * sqrt(length(full_dataset$days_since_tx_start))
 
-## Simulating the Sedia LAg ODn
-
-# # Load necessary libraries
-# library(ggplot2)
-# 
-# # Set seed for reproducibility
-# set.seed(123)
-# 
-# # Number of individuals
-# n_individuals <- 5000
-# 
-# # Time points (6-month intervals over 10 years)
-# time_points <- seq(0, 10, by = 0.5)
-# 
-# # Define the distributions for baseline
-# baseline_mean <- 3.47
-# baseline_sd <- 1.55
-# baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.001, b = 5)#rnorm(n_individuals, mean = baseline_mean, sd = baseline_sd)
-# 
-# # Define a two-degree polynomial to generate decay parameters
-# generate_decay_rate <- function(t) {
-#   # Two-degree polynomial: a*t^2 + b*t + c
-#   a <- 1.818730 #rnorm(n_individuals, mean = baseline_mean, sd = baseline_sd)
-#   b <- -8.97018
-#   c <- 3.254208
-#   decay_rate <- a * t^2 + b * t + c
-#   return(pmax(decay_rate, 0))  # Ensure decay rates are non-negative
-# }
-# 
-# # Generate decay rates for each time point
-# decay_rates <- sapply(time_points, generate_decay_rate)
-# 
-# # Define the exponential decay function with noise
-# exp_decay_with_noise <- function(t, baseline, decay_rate, noise_sd = 0.1) {
-#   noise <- rnorm(length(t), mean = 0, sd = noise_sd)
-#   pmax((baseline * exp(-decay_rate * t)) + noise, 0)
-# }
-# 
-# # Generate decay data for each individual
-# decay_data <- data.frame(time = rep(time_points, n_individuals),
-#                          individual = rep(1:n_individuals, each = length(time_points)),
-#                          value = unlist(lapply(1:n_individuals, function(i) {
-#                            exp_decay_with_noise(time_points, baselines[i], decay_rates)
-#                          })))
-# 
-# # Plot the decay curves
-# ggplot(decay_data, aes(x = time, y = value, group = individual)) +
-#   geom_line(alpha = 0.5) +
-#   labs(title = "Exponential Decay Curves for Individuals with Noise",
-#        x = "Time (years)",
-#        y = "ODn Value") +
-#   theme_minimal()
-
 #################################################################################
 ####individual decay rates
 # Load necessary libraries
@@ -294,28 +241,31 @@ pt_data <- read_csv("Sempa_final_pull_with_results.csv") %>%
          visits = 1:length(subject_label_blinded)) %>%
   filter(visits >=baseline_visit) %>%
   filter(Group == 'early suppressions') %>%
-  select(subject_label_blinded, days_since_eddi, test_date, sedia_ODn, viral_load, visits, baseline_visit) 
+  select(subject_label_blinded, days_since_eddi, test_date, `days since tx start`, sedia_ODn, viral_load, visits, baseline_visit) 
 pt_data_1 <- pt_data %>%
-  mutate(years_since_eddi = days_since_eddi/365.25) %>%
-  dplyr::select(subject_label_blinded, years_since_eddi, sedia_ODn, viral_load) %>%
+  mutate(years_since_eddi = days_since_eddi/365.25,
+         years_since_ART_start = (`days since tx start`/365.25)*-1) %>%
+  dplyr::select(subject_label_blinded, years_since_eddi, years_since_ART_start, sedia_ODn, viral_load) %>%
   filter(subject_label_blinded == 18724513)
 head(pt_data_1, 10)
 
-test_data <- data.frame(bind_cols(time_vec = c(pt_data_1[6:8,2]), ODn_vec = c(pt_data_1[6:8,3])))
-test_data <- data.frame(time_vec=c(383, 781, 907),#, 1109 
-                        ODn_vec = c(4.2600690, 3.6636771, 3.9360987)) #, 4.0426009
+test_data <- bind_rows(bind_cols(record_id = pt_data_1$subject_label_blinded[4:7], 
+                                 time_vec = pt_data_1$years_since_ART_start[4:7], ODn_vec = pt_data_1$sedia_ODn[4:7]),
+ bind_cols(record_id = rep(0525, 4), time_vec=c(235, 383, 781, 907)/365.25,#, 1109 
+                        ODn_vec = c(4.130290, 4.2600690, 3.6636771, 3.9360987))) #, 4.0426009
 best_model_choice <- function(test_data, param_sim_data) {
-  # browser()
-  ODn_vec <- test_data$sedia_ODn
-  time_vec <- test_data$years_since_eddi
+  time_vec <- test_data[,2]
+  ODn_vec <- test_data[,3]
   dt <- model_parameters
   a <- model_parameters$a
   b <- model_parameters$b
   c <- model_parameters$c
-  for (i in 1:length(ODn_vec)) {
-    t <- time_vec[i]
-    dt[[paste0("square_error", i)]] <- (ODn_vec[i] - pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001))^2
+  for (i in 1:length(ODn_vec[[1]])) {
+    t <- time_vec[[i,1]]
+    y <- ODn_vec[[i,1]]
+    dt[[paste0("square_error", i)]] <- (y - pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001))^2
   }
+  # browser()
   dt1 <- dt[!is.infinite(rowSums(dt)),]
   # stopifnot(length(dt1$baselines) == 0)
   dt2 <- dt1 %>%
@@ -327,7 +277,18 @@ best_model_choice <- function(test_data, param_sim_data) {
     dplyr::select(id, baselines, a, b, c, mse)
   return(dt2)
 }
-best_model_choice(test_data = test_data, param_sim_data = model_parameters)
+
+results <- c()
+ids <- unique(test_data$record_id)
+for (i in 1:length(unique(test_data$record_id))) {
+  best_model_parameters <- best_model_choice(test_data = test_data %>% 
+                                               filter(record_id == ids[i]), 
+                                             param_sim_data = model_parameters)
+  results <- rbind(results, best_model_parameters)
+}
+results <- results %>%
+  mutate(record_id = ids)
+head(results)
 ###########################################################
 ###sigma ODn
 ############################################################
@@ -362,3 +323,26 @@ sd_sedia_ODn_vs_ODn_bc
 
 noise <- summary(glm(sd_Sedia_ODn ~ mean_Sedia_ODn, data = sedia_distribution_blinded_controls %>%
                        mutate(sd_Sedia_ODn = `sigma Sedia ODn`, mean_Sedia_ODn = `mean Sedia ODn`)))
+######################################################################
+#How about a new time point?
+######################################################################
+compare_value_with_others <- function(data_set, t, y_ODn, sigma_ODn, sigma_y_ODn) {
+  # browser()
+  t <- t / 365.25
+  y <- 4.0426009
+  y_hat <- (best_model_parameters %>%
+    mutate(y_hat = pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001)))$y_hat
+  sigma_pooled <- (sigma_y_ODn^2 + sigma_ODn^2)^.5
+  z_test <- (y - y_hat) / sigma_pooled
+  set.seed(11)
+  Z <- Normal(0, 1) # make a standard normal r.v.
+  p_value <- 1 - cdf(Z, abs(z_test)) + cdf(Z, -abs(z_test))
+  results <- cbind(id = data_set$id, value = y, z_stat = z_test, p_value = p_value) # value = y,
+  return(results)
+}
+compare_value_with_others(data_set = best_model_parameters, 
+                          t = c(1109), #Must be in days
+                          y_ODn = c(4.0426009), 
+                          sigma_ODn = sd(test_data$ODn_vec),
+                          sigma_y_ODn = sd((full_dataset %>% filter(Group == 'early suppressions'))$sedia_ODn)
+                          )
