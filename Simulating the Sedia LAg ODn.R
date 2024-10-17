@@ -329,8 +329,8 @@ noise <- summary(glm(sd_Sedia_ODn ~ mean_Sedia_ODn, data = sedia_distribution_bl
 compare_value_with_others <- function(data_set, t, y_ODn, sigma_ODn, sigma_y_ODn) {
   # browser()
   t <- t / 365.25
-  y <- 4.0426009
-  y_hat <- (best_model_parameters %>%
+  y <- y_ODn
+  y_hat <- (data_set %>%
     mutate(y_hat = pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001)))$y_hat
   sigma_pooled <- (sigma_y_ODn^2 + sigma_ODn^2)^.5
   z_test <- (y - y_hat) / sigma_pooled
@@ -340,7 +340,7 @@ compare_value_with_others <- function(data_set, t, y_ODn, sigma_ODn, sigma_y_ODn
   results <- cbind(id = data_set$id, value = y, z_stat = z_test, p_value = p_value) # value = y,
   return(results)
 }
-compare_value_with_others(data_set = best_model_parameters, 
+compare_value_with_others(data_set = results %>% filter(record_id == 525),#best_model_parameters, 
                           t = c(1109), #Must be in days
                           y_ODn = c(4.0426009), 
                           sigma_ODn = sd(test_data$ODn_vec),
