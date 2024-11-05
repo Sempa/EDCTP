@@ -35,7 +35,7 @@ dt <- sediaData %>%
   filter(flag == 0) %>%
   arrange(subject_label_blinded, days_since_eddi)
 
-  # distinct(subject_label, .keep_all = T)
+# distinct(subject_label, .keep_all = T)
 baseline_ODn_data <- sediaData %>%
   mutate(flag = ifelse(viral_load > 10000 & n_visits==1, 1,0)) %>%
   filter(flag==1)
@@ -151,21 +151,15 @@ mean(c(baseline_ODn_table$sedia_ODn, baseline_ODn_data$ODn)) ## baseline mean
 sd(c(baseline_ODn_table$sedia_ODn, baseline_ODn_data$ODn))
 
 model_eddi <- nlme::lme(sedia_ODn ~ poly(days_since_eddi, 2), 
-                  data = sedia_eddi_data, 
-                  random = ~ days_since_eddi|subject_label_blinded,
-                  na.action = na.omit)
+                        data = sedia_eddi_data, 
+                        random = ~ days_since_eddi|subject_label_blinded,
+                        na.action = na.omit)
 summary(model_eddi)
 
-poly_model <- nlme::lme(sedia_ODn ~ poly(days_since_tx_start, 2), 
-                  data = full_dataset %>%
-                    filter(Group == 'early suppressions'), 
-                  random = ~days_since_tx_start|subject_label_blinded,
-                  na.action = na.omit)
-summary(poly_model)
-summary(poly_model)$tTable[,2][[1]]
-sd_fixed <- c(summary(poly_model)$tTable[,2][[1]], 
-              summary(poly_model)$tTable[,2][[2]],
-              summary(poly_model)$tTable[,2][[3]]) * sqrt(length(unique(sedia_eddi_data$subject_label_blinded)))
+summary(model_eddi)$tTable[,2][[1]]
+sd_fixed <- c(summary(model_eddi)$tTable[,2][[1]], 
+              summary(model_eddi)$tTable[,2][[2]],
+              summary(model_eddi)$tTable[,2][[3]]) * sqrt(length(unique(sedia_eddi_data$subject_label_blinded)))
 
 #################################################################################
 ####individual decay rates
@@ -190,12 +184,12 @@ baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = bas
 generate_decay_rate <- function(t) {
   # browser()
   # Two-degree polynomial: a*t^2 + b*t + c
-  a <- rnorm(1, mean = summary(poly_model)$tTable[,1][[3]], 
-             sd = summary(poly_model)$tTable[,2][[3]] * sqrt(length(unique(sedia_eddi_data$subject_label_blinded))))#1.818730
-  b <- rnorm(1, mean = summary(poly_model)$tTable[,1][[2]], 
-             sd = summary(poly_model)$tTable[,2][[2]] * sqrt(length(unique(sedia_eddi_data$subject_label_blinded))))#-8.97018
-  c <- rnorm(1, mean = summary(poly_model)$tTable[,1][[1]], 
-             sd = summary(poly_model)$tTable[,2][[1]] * sqrt(length(unique(sedia_eddi_data$subject_label_blinded))))#3.254208
+  a <- rnorm(1, mean = summary(model_eddi)$tTable[,1][[3]], 
+             sd = summary(model_eddi)$tTable[,2][[3]] * sqrt(length(unique(sedia_eddi_data$subject_label_blinded))))#1.818730
+  b <- rnorm(1, mean = summary(model_eddi)$tTable[,1][[2]], 
+             sd = summary(model_eddi)$tTable[,2][[2]] * sqrt(length(unique(sedia_eddi_data$subject_label_blinded))))#-8.97018
+  c <- rnorm(1, mean = summary(model_eddi)$tTable[,1][[1]], 
+             sd = summary(model_eddi)$tTable[,2][[1]] * sqrt(length(unique(sedia_eddi_data$subject_label_blinded))))#3.254208
   decay_rate <- a * t^2 + b * t + c
   return(c(pmax(decay_rate, 0.05), a, b, c))  # Ensure decay rates are non-negative
 }
@@ -217,9 +211,9 @@ decay_data <- data.frame(time = rep(time_points, n_individuals),
                            exp_decay(time_points, baselines[i], decay_rates[1:length(n_individuals), i])
                          })))
 model_parameters <- bind_cols(id = 1:n_individuals,
-  baseline = as.data.frame(baselines), 
-  remove_rownames(data.frame(t(data.frame(decay_rates[c(22,23,24),])))) %>%
-  dplyr::select(a = X1, b = X2, c = X3))
+                              baseline = as.data.frame(baselines), 
+                              remove_rownames(data.frame(t(data.frame(decay_rates[c(22,23,24),])))) %>%
+                                dplyr::select(a = X1, b = X2, c = X3))
 
 # Plot the decay curves
 ggplot(decay_data, aes(x = time, y = value, group = individual)) +
@@ -266,8 +260,8 @@ head(pt_data_1, 10)
 
 test_data <- bind_rows(bind_cols(record_id = pt_data_1$subject_label_blinded[4:7], 
                                  time_vec = pt_data_1$years_since_ART_start[4:7], ODn_vec = pt_data_1$sedia_ODn[4:7]),
- bind_cols(record_id = rep(0525, 4), time_vec=c(235, 383, 781, 907)/365.25,#, 1109 
-                        ODn_vec = c(4.130290, 4.2600690, 3.6636771, 3.9360987))) #, 4.0426009
+                       bind_cols(record_id = rep(0525, 4), time_vec=c(235, 383, 781, 907)/365.25,#, 1109 
+                                 ODn_vec = c(4.130290, 4.2600690, 3.6636771, 3.9360987))) #, 4.0426009
 best_model_choice <- function(test_data, param_sim_data) {
   time_vec <- test_data[,2]
   ODn_vec <- test_data[,3]
@@ -278,18 +272,19 @@ best_model_choice <- function(test_data, param_sim_data) {
   for (i in 1:length(ODn_vec[[1]])) {
     t <- time_vec[[i,1]]
     y <- ODn_vec[[i,1]]
-    dt[[paste0("square_error", i)]] <- (y - pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001))^2
+    dt[[paste0("absolute_error", i)]] <- (y - pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001))/y
   }
   # browser()
   dt1 <- dt[!is.infinite(rowSums(dt)),]
   # stopifnot(length(dt1$baselines) == 0)
   dt2 <- dt1 %>%
     rowwise() %>%
-    mutate(mse = sum(c_across(starts_with("square_error")))/length(ODn_vec)) %>%
+    mutate(#mse = sum(c_across(starts_with("absolute_error")))/length(ODn_vec)
+            mape = mean(c_across(starts_with("absolute_error")))) %>%
     ungroup() %>%
-    mutate(min_slope = min(mse)) %>%
-    filter(mse == min(mse)) %>%
-    dplyr::select(id, baselines, a, b, c, mse)
+    mutate(min_slope = min(mape)) %>%
+    filter(mape == min(mape)) %>%
+    dplyr::select(id, baselines, a, b, c, mape)
   return(dt2)
 }
 
@@ -346,7 +341,7 @@ compare_value_with_others <- function(data_set, t, y_ODn, sigma_ODn, sigma_y_ODn
   t <- t / 365.25
   y <- y_ODn
   y_hat <- (data_set %>%
-    mutate(y_hat = pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001)))$y_hat
+              mutate(y_hat = pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001)))$y_hat
   sigma_pooled <- (sigma_y_ODn^2 + sigma_ODn^2)^.5
   z_test <- (y - y_hat) / sigma_pooled
   set.seed(11)
@@ -360,4 +355,4 @@ compare_value_with_others(data_set = results %>% filter(record_id == 525),#best_
                           y_ODn = c(4.0426009), 
                           sigma_ODn = sd(test_data$ODn_vec),
                           sigma_y_ODn = sd((full_dataset %>% filter(Group == 'early suppressions'))$sedia_ODn)
-                          )
+)
