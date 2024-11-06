@@ -139,7 +139,8 @@ sedia_eddi_data <- bind_rows(
     dplyr::select(subject_label_blinded, sex, days_since_eddi, sedia_ODn = ODn),
   cephia_samples %>%
     filter(Group == 'early suppressions') %>%
-    dplyr::select(subject_label_blinded, sex = Sex, days_since_eddi, sedia_ODn)
+    mutate(years_since_eddi = days_since_eddi/365.25) %>%
+    dplyr::select(subject_label_blinded, sex = Sex, years_since_eddi, sedia_ODn)
 )
 
 baseline_ODn_table <- full_dataset %>%
@@ -150,9 +151,9 @@ baseline_ODn_table <- full_dataset %>%
 mean(c(baseline_ODn_table$sedia_ODn, baseline_ODn_data$ODn)) ## baseline mean
 sd(c(baseline_ODn_table$sedia_ODn, baseline_ODn_data$ODn))
 
-model_eddi <- nlme::lme(sedia_ODn ~ poly(days_since_eddi, 2), 
+model_eddi <- nlme::lme(sedia_ODn ~ poly(years_since_eddi, 2), 
                         data = sedia_eddi_data, 
-                        random = ~ days_since_eddi|subject_label_blinded,
+                        random = ~ years_since_eddi|subject_label_blinded,
                         na.action = na.omit)
 summary(model_eddi)
 
@@ -258,10 +259,32 @@ pt_data_1 <- pt_data %>%
   filter(subject_label_blinded == 18724513)
 head(pt_data_1, 10)
 
-test_data <- bind_rows(bind_cols(record_id = pt_data_1$subject_label_blinded[4:7], 
-                                 time_vec = pt_data_1$years_since_ART_start[4:7], ODn_vec = pt_data_1$sedia_ODn[4:7]),
-                       bind_cols(record_id = rep(0525, 4), time_vec=c(235, 383, 781, 907)/365.25,#, 1109 
-                                 ODn_vec = c(4.130290, 4.2600690, 3.6636771, 3.9360987))) #, 4.0426009
+dt02 <- read_csv("data/20180410-EP-LAgSedia-Generic.csv") %>% 
+  dplyr::select(subject_label_blinded, visit_date, test_date, art_initiation_date, 
+                days_since_eddi, viral_load, sedia_ODn = result...72) %>% 
+  arrange(subject_label_blinded, test_date) %>%
+  filter(as.character(art_initiation_date) != '') %>%
+  filter(test_date >= art_initiation_date) %>%
+  mutate(x = ifelse(viral_load >999,1,0)) %>%
+  group_by(subject_label_blinded) %>%
+  mutate(flag = max(x)) %>%
+  ungroup() %>%
+  filter(flag == 1) %>%
+  group_by(subject_label_blinded) %>%
+  mutate(x = 1:length(subject_label_blinded)) %>%
+  mutate(flag = max(x)) %>%
+  filter(flag >2)
+# write.csv(x, 'output_table/visits_during_ART.csv')
+dt03 <- read_csv('output_table/visits_during_ART - edited.csv') %>%
+  filter(selected_visits == 1) %>%
+  mutate(years_since_eddi = days_since_eddi/365.25) %>%
+  dplyr::select(subject_label_blinded, years_since_eddi, sedia_ODn, selected_visits, peak)
+
+test_data <- bind_rows(bind_cols(record_id = pt_data_1$subject_label_blinded[4:8], 
+                                 time_vec = pt_data_1$years_since_eddi[4:8], ODn_vec = pt_data_1$sedia_ODn[4:8],
+                                 peak_visit = c(rep(NA,4),1)),
+                       bind_cols(record_id = dt03$subject_label_blinded, time_vec = dt03$years_since_eddi, 
+                                 ODn_vec = dt03$sedia_ODn, peak_visit = dt03$peak))
 best_model_choice <- function(test_data, param_sim_data) {
   time_vec <- test_data[,2]
   ODn_vec <- test_data[,3]
@@ -292,6 +315,7 @@ results <- c()
 ids <- unique(test_data$record_id)
 for (i in 1:length(unique(test_data$record_id))) {
   best_model_parameters <- best_model_choice(test_data = test_data %>% 
+                                               filter(is.na(peak_visit)) %>%
                                                filter(record_id == ids[i]), 
                                              param_sim_data = model_parameters)
   results <- rbind(results, best_model_parameters)
@@ -329,7 +353,7 @@ sd_sedia_ODn_vs_ODn_bc <- sedia_distribution_blinded_controls %>%
   expand_limits(x = 0, y = 0) +
   geom_smooth(method = lm, size = 1.5, se = FALSE)
 
-sd_sedia_ODn_vs_ODn_bc
+# sd_sedia_ODn_vs_ODn_bc
 
 noise <- summary(glm(sd_Sedia_ODn ~ mean_Sedia_ODn, data = sedia_distribution_blinded_controls %>%
                        mutate(sd_Sedia_ODn = `sigma Sedia ODn`, mean_Sedia_ODn = `mean Sedia ODn`)))
@@ -350,9 +374,14 @@ compare_value_with_others <- function(data_set, t, y_ODn, sigma_ODn, sigma_y_ODn
   results <- cbind(id = data_set$id, value = y, z_stat = z_test, p_value = p_value) # value = y,
   return(results)
 }
-compare_value_with_others(data_set = results %>% filter(record_id == 525),#best_model_parameters, 
-                          t = c(1109), #Must be in days
-                          y_ODn = c(4.0426009), 
-                          sigma_ODn = sd(test_data$ODn_vec),
+test_data_last_visit <- test_data %>%
+  filter(!is.na(peak_visit))
+results1 <- c()
+for (i in 1:length(results$record_id)) {
+results1 <- rbind(results1, compare_value_with_others(data_set = results %>% filter(record_id == results$record_id[i]),#best_model_parameters, 
+                          t = test_data_last_visit$time_vec[test_data_last_visit$record_id == results$record_id[i]], #Must be in days
+                          y_ODn = test_data_last_visit$ODn_vec[test_data_last_visit$record_id == results$record_id[i]], 
+                          sigma_ODn = sd(test_data$ODn_vec[test_data$record_id == results$record_id[i] & is.na(test_data$peak_visit)]),
                           sigma_y_ODn = sd((full_dataset %>% filter(Group == 'early suppressions'))$sedia_ODn)
-)
+))
+}
