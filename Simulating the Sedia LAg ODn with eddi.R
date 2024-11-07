@@ -19,7 +19,8 @@ sediaData_full <- read_csv("data/JHU/CEPHIA - JHU LAg-Avidity Data.csv") %>%
   dplyr::select(-id)
 
 sediaData <- sediaData_full %>%
-  filter(!is.na(days_since_eddi)) %>%
+  filter(!is.na(art_initiation_date)) %>%
+  filter(!is.na(days_since_eddi) | visit_date>= art_initiation_date) %>%
   filter(!is.na(viral_load)) %>%
   filter(on_treatment == 'TRUE') %>%
   mutate(subject_eddi = paste(subject_label, days_since_eddi, sep = ' ')) %>%
@@ -33,7 +34,8 @@ sediaData <- sediaData_full %>%
   ungroup() %>%
   filter(tot_visits>2) %>%
   # filter(subject_label %in% x) %>%
-  dplyr::select(subject_label_blinded = subject_label, sex, viral_load, days_since_eddi, ODn, n_visits) %>%
+  dplyr::select(subject_label_blinded = subject_label, sex, viral_load, 
+                art_initiation_date, days_since_eddi, ODn, n_visits) %>%
   arrange(subject_label_blinded, days_since_eddi)
 dt <- sediaData %>%
   mutate(x= ifelse(viral_load > 999, 1,0)) %>%
@@ -43,9 +45,9 @@ dt <- sediaData %>%
   arrange(subject_label_blinded, days_since_eddi)
 
 # distinct(subject_label, .keep_all = T)
-baseline_ODn_data <- sediaData %>%
-  mutate(flag = ifelse(viral_load > 10000 & n_visits==1, 1,0)) %>%
-  filter(flag==1)
+baseline_ODn_data <- read_csv("Sempa_final_pull_with_results.csv") %>%
+  # mutate(flag = ifelse(viral_load > 10000 & n_visits==1, 1,0)) %>%
+  filter(`days since tx start` < 1)
 cephia_samples <- cephia_pts <- read_csv("Sempa_final_pull_with_results.csv") %>%
   mutate(vl = ifelse(`Viral Load at Draw` == "<40", "40", ifelse(`Viral Load at Draw` == "NULL", "", `Viral Load at Draw`))) %>%
   mutate(
@@ -389,6 +391,6 @@ results1 <- rbind(results1, compare_value_with_others(data_set = results %>% fil
                           t = test_data_last_visit$time_vec[test_data_last_visit$record_id == results$record_id[i]], #Must be in days
                           y_ODn = test_data_last_visit$ODn_vec[test_data_last_visit$record_id == results$record_id[i]], 
                           sigma_ODn = sd(test_data$ODn_vec[test_data$record_id == results$record_id[i] & is.na(test_data$peak_visit)]),
-                          sigma_y_ODn = sd((full_dataset %>% filter(Group == 'early suppressions'))$sedia_ODn)
+                          sigma_y_ODn = sd(dt$ODn)
 ))
 }
