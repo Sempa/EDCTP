@@ -9,7 +9,14 @@ library(splines)
 library(cowplot)
 library(distributions3)
 
-sediaData_full <- read_csv("data/JHU/CEPHIA - JHU LAg-Avidity Data.csv")
+sediaData_full <- read_csv("data/JHU/CEPHIA - JHU LAg-Avidity Data.csv") %>%
+  mutate(visit_date = as.Date(sample_date, "%m/%d/%Y"),
+         id = paste0(specimen_label, visit_date)
+         ) %>%
+  left_join(read_csv("data/20180410-EP-LAgSedia-Generic.csv") %>%
+              mutate(id = paste0(specimen_label, visit_date)) %>%
+              dplyr::select(id, art_initiation_date), by = 'id') %>%
+  dplyr::select(-id)
 
 sediaData <- sediaData_full %>%
   filter(!is.na(days_since_eddi)) %>%
