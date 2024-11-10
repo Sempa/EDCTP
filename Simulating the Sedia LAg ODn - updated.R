@@ -231,42 +231,86 @@ ggplot(decay_data, aes(x = time, y = value, group = individual)) +
 ###########################################################
 ##getting data to use for testing - CEPHIA EDCTP data
 ###########################################################
-pt_data <- read_csv("Sempa_final_pull_with_results.csv") %>%
-  mutate(vl = ifelse(`Viral Load at Draw` == "<40", "40", ifelse(`Viral Load at Draw` == "NULL", "", `Viral Load at Draw`))) %>%
-  mutate(
-    logvl = log(as.numeric(vl), 10),
-    time_on_trt = -1 * `days since tx start`,
-    sedia_ODn = `Sedia LAg Odn screen`,
-    RaceEthnicity = `Race/Ethnicity`,
-    viral_load = as.numeric(vl),
-    test_date = visit_date,
-    days_since_eddi = `Days from EDDI to draw`
-  ) %>%
-  arrange(subject_label_blinded, time_on_trt) %>%
+# pt_data <- read_csv("Sempa_final_pull_with_results.csv") %>%
+#   mutate(vl = ifelse(`Viral Load at Draw` == "<40", "40", ifelse(`Viral Load at Draw` == "NULL", "", `Viral Load at Draw`))) %>%
+#   mutate(
+#     logvl = log(as.numeric(vl), 10),
+#     time_on_trt = -1 * `days since tx start`,
+#     sedia_ODn = `Sedia LAg Odn screen`,
+#     RaceEthnicity = `Race/Ethnicity`,
+#     viral_load = as.numeric(vl),
+#     test_date = visit_date,
+#     days_since_eddi = `Days from EDDI to draw`
+#   ) %>%
+#   arrange(subject_label_blinded, time_on_trt) %>%
+#   group_by(subject_label_blinded) %>%
+#   mutate(visits = 1:length(subject_label_blinded),
+#          unsupressed_visits = ifelse(viral_load >999, 1,0)) %>%
+#   mutate(visits = ifelse(unsupressed_visits==1, visits, NA),
+#          baseline_visit = ifelse(unsupressed_visits==1, max(visits, na.rm = T), 0)) %>%
+#   mutate(baseline_visit = ifelse((subject_label_blinded == 35329295 | subject_label_blinded == 52033420), 1, 
+#                                  ifelse(subject_label_blinded == 54382839, 5, 
+#                                         ifelse(subject_label_blinded == 64577680,13, baseline_visit)))) %>%
+#   mutate(baseline_visit = max(baseline_visit),
+#          visits = 1:length(subject_label_blinded)) %>%
+#   filter(visits >=baseline_visit) %>%
+#   filter(Group == 'early suppressions') %>%
+#   select(subject_label_blinded, days_since_eddi, test_date, `days since tx start`, sedia_ODn, viral_load, visits, baseline_visit) 
+# pt_data_1 <- pt_data %>%
+#   mutate(years_since_eddi = days_since_eddi/365.25,
+#          years_since_ART_start = (`days since tx start`/365.25)*-1) %>%
+#   dplyr::select(subject_label_blinded, years_since_eddi, years_since_ART_start, sedia_ODn, viral_load) %>%
+#   filter(subject_label_blinded == 18724513)
+# head(pt_data_1, 10)
+# 
+# test_data <- bind_rows(bind_cols(record_id = pt_data_1$subject_label_blinded[4:7], 
+#                                  time_vec = pt_data_1$years_since_ART_start[4:7], ODn_vec = pt_data_1$sedia_ODn[4:7]),
+#  bind_cols(record_id = rep(0525, 4), time_vec=c(235, 383, 781, 907)/365.25,#, 1109 
+#                         ODn_vec = c(4.130290, 4.2600690, 3.6636771, 3.9360987))) #, 4.0426009
+dt02 <- read_csv("data/20180410-EP-LAgSedia-Generic.csv") %>%
+  filter(on_treatment == T) %>%
+  dplyr::select(subject_label_blinded, visit_date, test_date, art_initiation_date, 
+                days_since_eddi, viral_load, sedia_ODn = result...72) %>% 
+  arrange(subject_label_blinded, test_date) %>%
+  # filter(as.character(art_initiation_date) != '') %>%
+  # filter(visit_date >= art_initiation_date) %>%
+  mutate(years_since_ART_start = as.numeric(visit_date-art_initiation_date)/365.25) %>%
+  arrange(subject_label_blinded, visit_date) %>%
   group_by(subject_label_blinded) %>%
-  mutate(visits = 1:length(subject_label_blinded),
-         unsupressed_visits = ifelse(viral_load >999, 1,0)) %>%
-  mutate(visits = ifelse(unsupressed_visits==1, visits, NA),
-         baseline_visit = ifelse(unsupressed_visits==1, max(visits, na.rm = T), 0)) %>%
-  mutate(baseline_visit = ifelse((subject_label_blinded == 35329295 | subject_label_blinded == 52033420), 1, 
-                                 ifelse(subject_label_blinded == 54382839, 5, 
-                                        ifelse(subject_label_blinded == 64577680,13, baseline_visit)))) %>%
-  mutate(baseline_visit = max(baseline_visit),
-         visits = 1:length(subject_label_blinded)) %>%
-  filter(visits >=baseline_visit) %>%
-  filter(Group == 'early suppressions') %>%
-  select(subject_label_blinded, days_since_eddi, test_date, `days since tx start`, sedia_ODn, viral_load, visits, baseline_visit) 
-pt_data_1 <- pt_data %>%
-  mutate(years_since_eddi = days_since_eddi/365.25,
-         years_since_ART_start = (`days since tx start`/365.25)*-1) %>%
-  dplyr::select(subject_label_blinded, years_since_eddi, years_since_ART_start, sedia_ODn, viral_load) %>%
-  filter(subject_label_blinded == 18724513)
-head(pt_data_1, 10)
+  mutate(x = 1:length(subject_label_blinded)) %>%
+  mutate(flag = max(x)) %>%
+  ungroup() %>%
+  filter(flag >2) %>%
+  group_by(subject_label_blinded) %>%
+  mutate(x = 1:length(subject_label_blinded),
+         flag = max(x)) %>%
+  mutate(peak = ifelse(x==flag, 1, NA)) %>%
+  ungroup() %>%
+  mutate(strata = 'early suppressions') %>%
+  dplyr::select(subject_label_blinded, strata, years_since_ART_start,sedia_ODn, peak)
+# write.csv(x, 'output_table/visits_during_ART.csv')
+# dt03 <- read_csv('output_table/visits_during_ART - edited.csv') %>%
+#   filter(selected_visits == 1) %>%
+#   mutate(years_since_eddi = days_since_eddi/365.25) %>%
+#   dplyr::select(subject_label_blinded, years_since_eddi, sedia_ODn, selected_visits, peak)
+dt04 <- full_dataset %>%
+  filter(Group == 'suppression failures') %>%
+  group_by(subject_label_blinded) %>%
+  mutate(x = 1:length(subject_label_blinded),
+         flag = max(x)) %>%
+  mutate(peak = ifelse(x==flag, 1, NA)) %>%
+  ungroup() %>%
+  filter(flag >2) %>%
+  mutate(years_since_ART_start = `days since tx start`/365.25) %>%
+  dplyr::select(subject_label_blinded, strata = Group, years_since_ART_start, sedia_ODn, peak)
+test_data <- bind_rows(
+  dt02 %>%
+    mutate(subject_label_blinded = as.character(subject_label_blinded)), dt04
+) %>%
+  mutate(id = as.numeric(as.factor(subject_label_blinded))) %>%
+  dplyr::select(record_id = id, time_vec = years_since_ART_start, 
+                ODn_vec = sedia_ODn, peak_visit = peak)
 
-test_data <- bind_rows(bind_cols(record_id = pt_data_1$subject_label_blinded[4:7], 
-                                 time_vec = pt_data_1$years_since_ART_start[4:7], ODn_vec = pt_data_1$sedia_ODn[4:7]),
- bind_cols(record_id = rep(0525, 4), time_vec=c(235, 383, 781, 907)/365.25,#, 1109 
-                        ODn_vec = c(4.130290, 4.2600690, 3.6636771, 3.9360987))) #, 4.0426009
 best_model_choice <- function(test_data, param_sim_data) {
   time_vec <- test_data[,2]
   ODn_vec <- test_data[,3]
@@ -277,18 +321,19 @@ best_model_choice <- function(test_data, param_sim_data) {
   for (i in 1:length(ODn_vec[[1]])) {
     t <- time_vec[[i,1]]
     y <- ODn_vec[[i,1]]
-    dt[[paste0("square_error", i)]] <- (y - pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001))^2
+    dt[[paste0("absolute_error", i)]] <- (y - pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001))/y
   }
   # browser()
   dt1 <- dt[!is.infinite(rowSums(dt)),]
   # stopifnot(length(dt1$baselines) == 0)
   dt2 <- dt1 %>%
     rowwise() %>%
-    mutate(mse = sum(c_across(starts_with("square_error")))/length(ODn_vec)) %>%
+    mutate(#mse = sum(c_across(starts_with("absolute_error")))/length(ODn_vec)
+      mape = mean(c_across(starts_with("absolute_error")))) %>%
     ungroup() %>%
-    mutate(min_slope = min(mse)) %>%
-    filter(mse == min(mse)) %>%
-    dplyr::select(id, baselines, a, b, c, mse)
+    mutate(min_slope = min(mape)) %>%
+    filter(mape == min(mape)) %>%
+    dplyr::select(id, baselines, a, b, c, mape)
   return(dt2)
 }
 
@@ -296,6 +341,7 @@ results <- c()
 ids <- unique(test_data$record_id)
 for (i in 1:length(unique(test_data$record_id))) {
   best_model_parameters <- best_model_choice(test_data = test_data %>% 
+                                               filter(is.na(peak_visit)) %>%
                                                filter(record_id == ids[i]), 
                                              param_sim_data = model_parameters)
   results <- rbind(results, best_model_parameters)
@@ -340,23 +386,67 @@ noise <- summary(glm(sd_Sedia_ODn ~ mean_Sedia_ODn, data = sedia_distribution_bl
 ######################################################################
 #How about a new time point?
 ######################################################################
-compare_value_with_others <- function(data_set, t, y_ODn, sigma_ODn, sigma_y_ODn) {
+compare_value_with_others <- function(data_set, t, y_ODn, sigma_ODn, sigma_y_ODn, id) {
   # browser()
   t <- t / 365.25
   y <- y_ODn
   y_hat <- (data_set %>%
-    mutate(y_hat = pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001)))$y_hat
+              mutate(y_hat = pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001)))$y_hat
   sigma_pooled <- (sigma_y_ODn^2 + sigma_ODn^2)^.5
   z_test <- (y - y_hat) / sigma_pooled
   set.seed(11)
   Z <- Normal(0, 1) # make a standard normal r.v.
   p_value <- 1 - cdf(Z, abs(z_test)) + cdf(Z, -abs(z_test))
-  results <- cbind(id = data_set$id, value = y, z_stat = z_test, p_value = p_value) # value = y,
+  results <- cbind(id = data_set$id, value = y, z_stat = z_test, p_value = p_value, record_id = id) # value = y,
   return(results)
 }
-compare_value_with_others(data_set = results %>% filter(record_id == 525),#best_model_parameters, 
-                          t = c(1109), #Must be in days
-                          y_ODn = c(4.0426009), 
-                          sigma_ODn = sd(test_data$ODn_vec),
-                          sigma_y_ODn = sd((full_dataset %>% filter(Group == 'early suppressions'))$sedia_ODn)
-                          )
+test_data_last_visit <- test_data %>%
+  filter(!is.na(peak_visit))
+results1 <- c()
+for (i in 1:length(results$record_id)) {
+  results1 <- rbind(results1, compare_value_with_others(data_set = results %>% filter(record_id == results$record_id[i]),#best_model_parameters, 
+                                                        t = test_data_last_visit$time_vec[test_data_last_visit$record_id == results$record_id[i]], #Must be in days
+                                                        y_ODn = test_data_last_visit$ODn_vec[test_data_last_visit$record_id == results$record_id[i]], 
+                                                        sigma_ODn = sd(test_data$ODn_vec[test_data$record_id == results$record_id[i] & is.na(test_data$peak_visit)]),
+                                                        sigma_y_ODn = sd(dt$ODn),
+                                                        id = results$record_id[i]
+  ))
+}
+dt05 <- as.data.frame(results1) %>%
+  left_join(bind_rows(
+    dt02 %>%
+      mutate(subject_label_blinded = as.character(subject_label_blinded)), dt04
+  ) %>%
+    mutate(record_id = as.numeric(as.factor(subject_label_blinded))), by = 'record_id') %>%
+  dplyr::select(names(as.data.frame(results1)), strata) %>%
+  distinct(record_id, .keep_all = T) %>%
+  mutate(y_hat_status = as.factor(ifelse(p_value < 0.05, 1, 2)),
+         y = as.factor(ifelse(strata == 'early suppressions', 1, 2)) )
+(34-8)/34 #specificity
+0/6 # sensitivity
+
+dt06 <- dt05 %>%
+  dplyr::select(y, y_hat_status) %>%
+  tbl_summary(by = y)
+dt06
+dt07 <- dt05 %>%
+  mutate(`significance 99%` = ifelse(as.numeric(z_stat) > qnorm(0.99), TRUE, FALSE),
+         `significance 98.5%` = ifelse(as.numeric(z_stat) > qnorm(0.985), TRUE, FALSE),
+         `significance 98%` = ifelse(as.numeric(z_stat) > qnorm(0.98), TRUE, FALSE),
+         `significance 97.5%` = ifelse(as.numeric(z_stat) > qnorm(0.975), TRUE, FALSE),
+         `significance 95%` = ifelse(as.numeric(z_stat) > qnorm(0.95), TRUE, FALSE),
+         `P-value` = as.numeric(p_value)) %>%
+  filter(strata == 'early suppressions')
+dt08 <- dt05 %>%
+  mutate(`significance 99%` = ifelse(as.numeric(z_stat) > qnorm(0.99), TRUE, FALSE),
+         `significance 98.5%` = ifelse(as.numeric(z_stat) > qnorm(0.985), TRUE, FALSE),
+         `significance 98%` = ifelse(as.numeric(z_stat) > qnorm(0.98), TRUE, FALSE),
+         `significance 97.5%` = ifelse(as.numeric(z_stat) > qnorm(0.975), TRUE, FALSE),
+         `significance 95%` = ifelse(as.numeric(z_stat) > qnorm(0.95), TRUE, FALSE),
+         `P-value` = as.numeric(p_value)) %>%
+  filter(strata != 'early suppressions')
+
+# Specificity
+round(table(dt07$`significance 95%`)[[1]] / (table(dt07$`significance 95%`)[[1]] + table(dt07$`significance 95%`)[[2]]), 3)
+# Sensitivity
+round(table(dt08$`significance 95%`)[[1]] / (table(dt08$`significance 95%`)[[1]] + 0), 3)
