@@ -408,7 +408,7 @@ for (i in 1:length(results$record_id)) {
                                                         t = test_data_last_visit$time_vec[test_data_last_visit$record_id == results$record_id[i]], #Must be in days
                                                         y_ODn = test_data_last_visit$ODn_vec[test_data_last_visit$record_id == results$record_id[i]], 
                                                         sigma_ODn = sd(test_data$ODn_vec[test_data$record_id == results$record_id[i] & is.na(test_data$peak_visit)]),
-                                                        sigma_y_ODn = sd(dt$ODn),
+                                                        sigma_y_ODn = sd((full_dataset %>% filter(Group == 'early suppressions'))$sedia_ODn), #sd(dt$ODn),
                                                         id = results$record_id[i]
   ))
 }
@@ -420,33 +420,20 @@ dt05 <- as.data.frame(results1) %>%
     mutate(record_id = as.numeric(as.factor(subject_label_blinded))), by = 'record_id') %>%
   dplyr::select(names(as.data.frame(results1)), strata) %>%
   distinct(record_id, .keep_all = T) %>%
-  mutate(y_hat_status = as.factor(ifelse(p_value < 0.05, 1, 2)),
-         y = as.factor(ifelse(strata == 'early suppressions', 1, 2)) )
-(34-8)/34 #specificity
-0/6 # sensitivity
+  mutate(y_hat_status = ifelse(p_value < 0.05 & strata == 'early suppressions', 1, 
+                               ifelse(p_value >= 0.05 & strata == 'early suppressions', 2, NA)),
+         y_hat_status = ifelse(p_value < 0.05 & strata != 'early suppressions', 1, 
+                               ifelse(p_value >= 0.05 & strata != 'early suppressions', 2, y_hat_status)),
+         y = ifelse(strata == 'early suppressions', 2, 1))
+table(dt05$y_hat_status[dt05$strata == 'early suppressions']) #specificity
+table(dt05$y_hat_status[dt05$strata != 'early suppressions']) # sensitivity
+
+# Calculate AUC
+pROC::auc(dt05$y, probabilities)
+
 
 dt06 <- dt05 %>%
   dplyr::select(y, y_hat_status) %>%
-  tbl_summary(by = y)
+  tbl_summary(by = y
+    )
 dt06
-dt07 <- dt05 %>%
-  mutate(`significance 99%` = ifelse(as.numeric(z_stat) > qnorm(0.99), TRUE, FALSE),
-         `significance 98.5%` = ifelse(as.numeric(z_stat) > qnorm(0.985), TRUE, FALSE),
-         `significance 98%` = ifelse(as.numeric(z_stat) > qnorm(0.98), TRUE, FALSE),
-         `significance 97.5%` = ifelse(as.numeric(z_stat) > qnorm(0.975), TRUE, FALSE),
-         `significance 95%` = ifelse(as.numeric(z_stat) > qnorm(0.95), TRUE, FALSE),
-         `P-value` = as.numeric(p_value)) %>%
-  filter(strata == 'early suppressions')
-dt08 <- dt05 %>%
-  mutate(`significance 99%` = ifelse(as.numeric(z_stat) > qnorm(0.99), TRUE, FALSE),
-         `significance 98.5%` = ifelse(as.numeric(z_stat) > qnorm(0.985), TRUE, FALSE),
-         `significance 98%` = ifelse(as.numeric(z_stat) > qnorm(0.98), TRUE, FALSE),
-         `significance 97.5%` = ifelse(as.numeric(z_stat) > qnorm(0.975), TRUE, FALSE),
-         `significance 95%` = ifelse(as.numeric(z_stat) > qnorm(0.95), TRUE, FALSE),
-         `P-value` = as.numeric(p_value)) %>%
-  filter(strata != 'early suppressions')
-
-# Specificity
-round(table(dt07$`significance 95%`)[[1]] / (table(dt07$`significance 95%`)[[1]] + table(dt07$`significance 95%`)[[2]]), 3)
-# Sensitivity
-round(table(dt08$`significance 95%`)[[1]] / (table(dt08$`significance 95%`)[[1]] + 0), 3)
