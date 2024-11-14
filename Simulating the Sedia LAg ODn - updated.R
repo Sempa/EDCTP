@@ -132,7 +132,7 @@ full_dataset <- bind_rows(
       test_date, sedia_ODn, viral_load, visits, Group, cohort, to_peak
     )
 )  %>%
-  mutate(days_since_tx_start = `days since tx start`)
+  mutate(years_since_tx_start = `days since tx start`/365.25)
 
 sedia_eddi_data <- bind_rows(
   dt %>%
@@ -156,10 +156,10 @@ sd(c(baseline_ODn_table$sedia_ODn, baseline_ODn_data$ODn))
 #                   na.action = na.omit)
 # summary(model_eddi)
 
-poly_model <- nlme::lme(sedia_ODn ~ poly(days_since_tx_start, 2), 
+poly_model <- nlme::lme(sedia_ODn ~ poly(years_since_tx_start, 2), 
                   data = full_dataset %>%
                     filter(Group == 'early suppressions'), 
-                  random = ~days_since_tx_start|subject_label_blinded,
+                  random = ~years_since_tx_start|subject_label_blinded,
                   na.action = na.omit)
 summary(poly_model)
 summary(poly_model)$tTable[,2][[1]]
