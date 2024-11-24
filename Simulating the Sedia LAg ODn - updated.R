@@ -39,7 +39,7 @@ dt <- sediaData %>%
 baseline_ODn_data <- sediaData %>%
   mutate(flag = ifelse(viral_load > 10000 & n_visits==1, 1,0)) %>%
   filter(flag==1)
-cephia_samples <- cephia_pts <- read_csv("Sempa_final_pull_with_results.csv") %>%
+cephia_samples <- read_csv("Sempa_final_pull_with_results.csv") %>%
   mutate(vl = ifelse(`Viral Load at Draw` == "<40", "40", ifelse(`Viral Load at Draw` == "NULL", "", `Viral Load at Draw`))) %>%
   mutate(
     logvl = log(as.numeric(vl), 10),
@@ -175,7 +175,7 @@ sd_fixed <- c(summary(poly_model)$tTable[,2][[1]],
 set.seed(123)
 
 # Number of individuals
-n_individuals <- 1000
+n_individuals <- 10000
 
 # Time points (6-month intervals over 10 years)
 time_points <- seq(0, 10, by = 0.5)
@@ -219,7 +219,9 @@ model_parameters <- bind_cols(id = 1:n_individuals,
   baseline = as.data.frame(baselines), 
   remove_rownames(data.frame(t(data.frame(decay_rates[c(22,23,24),])))) %>%
   dplyr::select(a = X1, b = X2, c = X3))
-
+model_parameters <- readRDS('model_parameters_100K.rds')
+decay_data <- readRDS('decay_data_100K.rds')
+decay_rates <- readRDS('decay_rates_100K.rds')
 # Plot the decay curves
 ggplot(decay_data, aes(x = time, y = value, group = individual)) +
   geom_line(alpha = 0.5) +
@@ -286,7 +288,7 @@ dt02 <- read_csv("data/20180410-EP-LAgSedia-Generic.csv") %>%
          flag = max(x)) %>%
   mutate(peak = ifelse(x==flag, 1, NA)) %>%
   ungroup() %>%
-  mutate(strata = 'early suppressions') %>%
+  mutate(strata = 'early suppressions - cephia') %>%
   dplyr::select(subject_label_blinded, strata, years_since_ART_start,sedia_ODn, peak)
 # write.csv(x, 'output_table/visits_during_ART.csv')
 # dt03 <- read_csv('output_table/visits_during_ART - edited.csv') %>%
@@ -349,6 +351,8 @@ for (i in 1:length(unique(test_data$record_id))) {
 results <- results %>%
   mutate(record_id = ids)
 head(results)
+saveRDS(results, 'results_100k.rds')
+results <- readRDS('results_100k.rds')
 ###########################################################
 ###sigma ODn
 ############################################################
@@ -388,7 +392,7 @@ noise <- summary(glm(sd_Sedia_ODn ~ mean_Sedia_ODn, data = sedia_distribution_bl
 ######################################################################
 compare_value_with_others <- function(data_set, t, y_ODn, sigma_ODn, sigma_y_ODn, id) {
   # browser()
-  t <- t / 365.25
+  t <- t #/ 365.25
   y <- y_ODn
   y_hat <- (data_set %>%
               mutate(y_hat = pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001)))$y_hat
@@ -408,7 +412,7 @@ for (i in 1:length(results$record_id)) {
                                                         t = test_data_last_visit$time_vec[test_data_last_visit$record_id == results$record_id[i]], #Must be in days
                                                         y_ODn = test_data_last_visit$ODn_vec[test_data_last_visit$record_id == results$record_id[i]], 
                                                         sigma_ODn = sd(test_data$ODn_vec[test_data$record_id == results$record_id[i] & is.na(test_data$peak_visit)]),
-                                                        sigma_y_ODn = sd(dt$ODn),
+                                                        sigma_y_ODn = noise$coefficients[1,1] + noise$coefficients[2,1] * (test_data_last_visit$time_vec[test_data_last_visit$record_id == results$record_id[i]]), #sd((full_dataset %>% filter(Group == 'early suppressions'))$sedia_ODn), #sd(dt$ODn),
                                                         id = results$record_id[i]
   ))
 }
@@ -422,8 +426,6 @@ dt05 <- as.data.frame(results1) %>%
   distinct(record_id, .keep_all = T) %>%
   mutate(y_hat_status = as.factor(ifelse(p_value < 0.05, 1, 2)),
          y = as.factor(ifelse(strata == 'early suppressions', 1, 2)) )
-(34-8)/34 #specificity
-0/6 # sensitivity
 
 dt06 <- dt05 %>%
   dplyr::select(y, y_hat_status) %>%
@@ -449,4 +451,57 @@ dt08 <- dt05 %>%
 # Specificity
 round(table(dt07$`significance 95%`)[[1]] / (table(dt07$`significance 95%`)[[1]] + table(dt07$`significance 95%`)[[2]]), 3)
 # Sensitivity
-round(table(dt08$`significance 95%`)[[1]] / (table(dt08$`significance 95%`)[[1]] + 0), 3)
+round(0 / (table(dt08$`significance 95%`)[[1]] + 0), 3) #table(dt08$`significance 95%`)[[1]] table(dt08$`significance 95%`)[[2]]
+
+dt09 <- bind_rows(dt07, dt08)
+accuracy_dataset <- c()
+threshold <- seq(0,3, 0.2)
+for (i in 1:length(threshold)) {
+  dat_set1 <- dt09 %>%
+    filter(strata != 'early suppressions') %>%
+    mutate(x = ifelse(as.numeric(z_stat) > threshold[i], TRUE, FALSE))
+  if(length(table(dat_set1$x)) == 1 & names(table(dat_set1$x))[1] == 'FALSE') {
+    sensitivity_value <- 1} else if(length(table(dat_set1$x)) == 1 & names(table(dat_set1$x))[1] == 'TRUE'){ #& names(dat_set1$x)[1] == 'TRUE'
+      sensitivity_value <- 1
+    }else{
+      sensitivity_value <- round(table(dat_set1$x)[[2]] / (table(dat_set1$x)[[1]] + table(dat_set1$x)[[2]]), 3)
+    }
+  
+  
+  dat_set2 <- dt09 %>%
+    filter(strata == 'early suppressions') %>%
+    mutate(x = ifelse(as.numeric(z_stat) > threshold[i], TRUE, FALSE))
+  if(length(table(dat_set2$x)) == 1 & names(table(dat_set2$x))[1] == 'FALSE') {
+    specificity_value <- 1} else if(length(table(dat_set2$x)) == 1 & names(table(dat_set2$x))[1] == 'TRUE'){
+      specificity_value <- 0
+    }else{
+  specificity_value <- round(table(dat_set2$x)[[1]] / (table(dat_set2$x)[[1]] + table(dat_set2$x)[[2]]), 3)
+  }
+  dt <- c(`Z score` = threshold[i], value1 = sensitivity_value, value2 = specificity_value)
+  accuracy_dataset <- rbind(accuracy_dataset, dt)
+}
+
+accuracy_graph <- data.frame(accuracy_dataset) %>%
+  pivot_longer(cols = c('value1', 'value2'),
+               names_to = 'accuracy',
+               values_to = 'Accuracy.values') %>%
+  mutate(Accuracy = ifelse(accuracy=='value1', 'Sensitivity', 'Specificity')) %>%
+  ggplot(aes(x = Z.score, y = Accuracy.values, group = Accuracy)) +
+  geom_line(aes(color = Accuracy), size = 1.5) + #stat = "identity", position = position_dodge()
+  geom_point(aes(color = Accuracy), size = 3) +
+  scale_color_manual(values=c('#999999','#E69F00'))  +
+  scale_y_continuous(limits = c(0,1)) +
+  scale_x_continuous(breaks = c(seq(0, 3, 0.5)), labels = c(seq(0, 3, 0.5))) +
+  ylab('') + xlab('Z value threshold') +
+  labs(colour = NULL) +
+  theme(
+    text = element_text(size = 20),
+    plot.title = element_text(hjust = 0.5),
+    axis.line = element_line(colour = "black"),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    panel.background = element_blank(),
+    panel.border = element_blank(),
+    plot.margin = unit(c(0, 0, 0, 0), "null")#,
+    # axis.text.x = element_text(angle = 60, hjust = 1)
+  )

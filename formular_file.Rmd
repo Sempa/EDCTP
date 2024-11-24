@@ -1,0 +1,23 @@
+---
+title: "Linear Mixed Effects Model Formula"
+author: "Your Name"
+date: "2023-02-20"
+output: 
+  word_document: 
+    reference_docx: "path/to/reference.docx"
+---
+
+The linear mixed effects model with a random intercept for each individual and slope on time since ART initiation can be represented numerically as:
+
+$$Y_{ij} = \beta_0 + \beta_1 \cdot Time_{ij} + u_{0i} + u_{1i} \cdot Time_{ij} + \epsilon_{ij}$$
+
+where:
+
+* $Y_{ij}$ is the response variable for individual $i$ at time $j$
+* $\beta_0$ is the fixed effect intercept
+* $\beta_1$ is the fixed effect slope for time since ART initiation
+* $u_{0i}$ is the random intercept for individual $i$
+* $u_{1i}$ is the random slope for individual $i$
+* $\epsilon_{ij}$ is the residual error for individual $i$ at time $j$
+* $Time_{ij}$ is the time since ART initiation for individual $i$ at time $j$
+
