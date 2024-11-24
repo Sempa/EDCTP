@@ -429,7 +429,8 @@ dt05 <- as.data.frame(results1) %>%
 
 dt06 <- dt05 %>%
   dplyr::select(y, y_hat_status) %>%
-  tbl_summary(by = y)
+  tbl_summary(by = y
+    )
 dt06
 dt07 <- dt05 %>%
   mutate(`significance 99%` = ifelse(as.numeric(z_stat) > qnorm(0.99), TRUE, FALSE),
