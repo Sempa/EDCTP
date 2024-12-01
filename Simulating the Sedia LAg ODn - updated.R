@@ -219,9 +219,9 @@ model_parameters <- bind_cols(id = 1:n_individuals,
   baseline = as.data.frame(baselines), 
   remove_rownames(data.frame(t(data.frame(decay_rates[c(22,23,24),])))) %>%
   dplyr::select(a = X1, b = X2, c = X3))
-model_parameters <- readRDS('model_parameters_100K.rds')
-decay_data <- readRDS('decay_data_100K.rds')
-decay_rates <- readRDS('decay_rates_100K.rds')
+# model_parameters <- readRDS('model_parameters_100K.rds')
+# decay_data <- readRDS('decay_data_100K.rds')
+# decay_rates <- readRDS('decay_rates_100K.rds')
 # Plot the decay curves
 ggplot(decay_data, aes(x = time, y = value, group = individual)) +
   geom_line(alpha = 0.5) +
@@ -314,6 +314,7 @@ test_data <- bind_rows(
                 ODn_vec = sedia_ODn, peak_visit = peak)
 
 best_model_choice <- function(test_data, param_sim_data) {
+  # browser()
   time_vec <- test_data[,2]
   ODn_vec <- test_data[,3]
   dt <- model_parameters
@@ -323,7 +324,7 @@ best_model_choice <- function(test_data, param_sim_data) {
   for (i in 1:length(ODn_vec[[1]])) {
     t <- time_vec[[i,1]]
     y <- ODn_vec[[i,1]]
-    dt[[paste0("absolute_error", i)]] <- (y - pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001))/y
+    dt[[paste0("square_error", i)]] <- (y - pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001))^2
   }
   # browser()
   dt1 <- dt[!is.infinite(rowSums(dt)),]
@@ -331,11 +332,11 @@ best_model_choice <- function(test_data, param_sim_data) {
   dt2 <- dt1 %>%
     rowwise() %>%
     mutate(#mse = sum(c_across(starts_with("absolute_error")))/length(ODn_vec)
-      mape = mean(c_across(starts_with("absolute_error")))) %>%
+      rmse = sqrt(mean(c_across(starts_with("square_error"))))) %>%
     ungroup() %>%
-    mutate(min_slope = min(mape)) %>%
-    filter(mape == min(mape)) %>%
-    dplyr::select(id, baselines, a, b, c, mape)
+    mutate(min_slope = min(rmse)) %>%
+    filter(rmse == min(rmse)) %>%
+    dplyr::select(id, baselines, a, b, c, rmse)
   return(dt2)
 }
 
@@ -428,8 +429,8 @@ dt05 <- as.data.frame(results1) %>%
          y = as.factor(ifelse(strata == 'early suppressions', 1, 2)) )
 
 dt06 <- dt05 %>%
-  dplyr::select(y, y_hat_status) %>%
-  tbl_summary(by = y
+  dplyr::select(strata, y_hat_status) %>%
+  tbl_summary(by = strata
     )
 dt06
 dt07 <- dt05 %>%
@@ -439,7 +440,7 @@ dt07 <- dt05 %>%
          `significance 97.5%` = ifelse(as.numeric(z_stat) > qnorm(0.975), TRUE, FALSE),
          `significance 95%` = ifelse(as.numeric(z_stat) > qnorm(0.95), TRUE, FALSE),
          `P-value` = as.numeric(p_value)) %>%
-  filter(strata == 'early suppressions')
+  filter(strata == 'early suppressions - cephia')
 dt08 <- dt05 %>%
   mutate(`significance 99%` = ifelse(as.numeric(z_stat) > qnorm(0.99), TRUE, FALSE),
          `significance 98.5%` = ifelse(as.numeric(z_stat) > qnorm(0.985), TRUE, FALSE),
@@ -447,13 +448,28 @@ dt08 <- dt05 %>%
          `significance 97.5%` = ifelse(as.numeric(z_stat) > qnorm(0.975), TRUE, FALSE),
          `significance 95%` = ifelse(as.numeric(z_stat) > qnorm(0.95), TRUE, FALSE),
          `P-value` = as.numeric(p_value)) %>%
-  filter(strata != 'early suppressions')
+  filter(strata != 'early suppressions - cephia')
 
 # Specificity
 round(table(dt07$`significance 95%`)[[1]] / (table(dt07$`significance 95%`)[[1]] + table(dt07$`significance 95%`)[[2]]), 3)
+specificity_value <- cbind(`Accuracy values` = c(
+  round(table(dt07$`significance 95%`)[[1]] / (table(dt07$`significance 95%`)[[1]] + table(dt07$`significance 95%`)[[2]]), 3),
+  round(table(dt07$`significance 97.5%`)[[1]] / (table(dt07$`significance 97.5%`)[[1]] + table(dt07$`significance 97.5%`)[[2]]), 3),
+  round(table(dt07$`significance 98%`)[[1]] / (table(dt07$`significance 98%`)[[1]] + table(dt07$`significance 98%`)[[2]]), 3),
+  round(table(dt07$`significance 98.5%`)[[1]] / (table(dt07$`significance 98.5%`)[[1]] + table(dt07$`significance 98.5%`)[[2]]), 3),
+  round(table(dt07$`significance 99%`)[[1]] / (table(dt07$`significance 99%`)[[1]] + table(dt07$`significance 99%`)[[2]]), 3)
+), level = c('Significance 95%', 'Significance 97.5%', 'Significance 98%', 'Significance 98.5%', 'Significance 99%'), Accuracy = rep(c('Specificity'), 5)
+)
 # Sensitivity
 round(0 / (table(dt08$`significance 95%`)[[1]] + 0), 3) #table(dt08$`significance 95%`)[[1]] table(dt08$`significance 95%`)[[2]]
-
+sensitivity_value <- cbind(`Accuracy values` = c(
+  round(table(dt08$`significance 95%`)[[2]] / (table(dt08$`significance 95%`)[[1]] + table(dt08$`significance 95%`)[[2]]), 3),
+  round(table(dt08$`significance 97.5%`)[[2]] / (table(dt08$`significance 97.5%`)[[1]] + table(dt08$`significance 97.5%`)[[2]]), 3),
+  round(table(dt08$`significance 98%`)[[2]] / (table(dt08$`significance 98%`)[[1]] + table(dt08$`significance 98%`)[[2]]), 3),
+  round(table(dt08$`significance 98.5%`)[[2]] / (table(dt08$`significance 98.5%`)[[1]] + table(dt08$`significance 98.5%`)[[2]]), 3),
+  round(table(dt08$`significance 99%`)[[2]] / (table(dt08$`significance 99%`)[[1]] + table(dt08$`significance 99%`)[[2]]), 3)
+), level = c('Significance 95%', 'Significance 97.5%', 'Significance 98%', 'Significance 98.5%', 'Significance 99%'), Accuracy = rep('Sensitivity', 5)
+)
 dt09 <- bind_rows(dt07, dt08)
 accuracy_dataset <- c()
 threshold <- seq(0,3, 0.2)
@@ -461,23 +477,23 @@ for (i in 1:length(threshold)) {
   dat_set1 <- dt09 %>%
     filter(strata != 'early suppressions') %>%
     mutate(x = ifelse(as.numeric(z_stat) > threshold[i], TRUE, FALSE))
-  if(length(table(dat_set1$x)) == 1 & names(table(dat_set1$x))[1] == 'FALSE') {
-    sensitivity_value <- 1} else if(length(table(dat_set1$x)) == 1 & names(table(dat_set1$x))[1] == 'TRUE'){ #& names(dat_set1$x)[1] == 'TRUE'
-      sensitivity_value <- 1
-    }else{
+  # if(length(table(dat_set1$x)) == 1 & names(table(dat_set1$x))[1] == 'FALSE') {
+  #   sensitivity_value <- 1} else if(length(table(dat_set1$x)) == 1 & names(table(dat_set1$x))[1] == 'TRUE'){ #& names(dat_set1$x)[1] == 'TRUE'
+  #     sensitivity_value <- 1
+  #   }else{
       sensitivity_value <- round(table(dat_set1$x)[[2]] / (table(dat_set1$x)[[1]] + table(dat_set1$x)[[2]]), 3)
-    }
+    # }
   
   
   dat_set2 <- dt09 %>%
-    filter(strata == 'early suppressions') %>%
+    filter(strata == 'early suppressions - cephia') %>%
     mutate(x = ifelse(as.numeric(z_stat) > threshold[i], TRUE, FALSE))
-  if(length(table(dat_set2$x)) == 1 & names(table(dat_set2$x))[1] == 'FALSE') {
-    specificity_value <- 1} else if(length(table(dat_set2$x)) == 1 & names(table(dat_set2$x))[1] == 'TRUE'){
-      specificity_value <- 0
-    }else{
+  # if(length(table(dat_set2$x)) == 1 & names(table(dat_set2$x))[1] == 'FALSE') {
+  #   specificity_value <- 1} else if(length(table(dat_set2$x)) == 1 & names(table(dat_set2$x))[1] == 'TRUE'){
+  #     specificity_value <- 0
+  #   }else{
   specificity_value <- round(table(dat_set2$x)[[1]] / (table(dat_set2$x)[[1]] + table(dat_set2$x)[[2]]), 3)
-  }
+  # }
   dt <- c(`Z score` = threshold[i], value1 = sensitivity_value, value2 = specificity_value)
   accuracy_dataset <- rbind(accuracy_dataset, dt)
 }
@@ -506,3 +522,4 @@ accuracy_graph <- data.frame(accuracy_dataset) %>%
     plot.margin = unit(c(0, 0, 0, 0), "null")#,
     # axis.text.x = element_text(angle = 60, hjust = 1)
   )
+accuracy_graph
