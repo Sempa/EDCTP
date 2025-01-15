@@ -196,18 +196,16 @@ baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = bas
 generate_decay_rate <- function(t) {
   # browser()
   # Two-degree polynomial: a*t^2 + b*t + c
-  a <- rnorm(1, mean = fixed_effects[3,1], 
-             sd = summary(fit)$random$subject_label_blinded[3,1])#1.818730
-  b <- rnorm(1, mean = fixed_effects[2,1], 
-             sd = summary(fit)$random$subject_label_blinded[2,1])#-8.97018
-  c <- rnorm(1, mean = fixed_effects[1,1], 
-             sd = summary(fit)$random$subject_label_blinded[1,1])#3.254208
+  a <- rnorm(1, mean = fixed_effects[3,1], sd = fixed_effects[3,2])#1.818730
+  b <- rnorm(1, mean = fixed_effects[2,1], sd = fixed_effects[2,2])#-8.97018
+  c <- rnorm(1, mean = fixed_effects[1,1], sd = fixed_effects[1,2])#3.254208
   decay_rate <- a * t^2 + b * t + c
   return(c(pmax(decay_rate, 0.05), a, b, c))  # Ensure decay rates are non-negative
 }
 
 # Generate decay rates for each individual
 decay_rates <- sapply(1:n_individuals, function(i) {
+  # browser()
   generate_decay_rate(time_points)  # Each individual has a unique decay rate
 })
 
