@@ -428,8 +428,23 @@ dt05 <- as.data.frame(results1) %>%
   mutate(y_hat_status = as.factor(ifelse(p_value < 0.05, 1, 2)),
          y = as.factor(ifelse(strata == 'early suppressions', 1, 2)) )
 
+x <- dt05 %>% 
+  filter(strata != 'early suppressions - cephia') %>% 
+  mutate(direction = ifelse(z_stat <0, 'neg', 'pos')) %>% 
+  dplyr::select(direction, y_hat_status) %>% 
+  tbl_summary(y_hat_status)
+table(x$y_hat_status, x$direction)
+
+x1 <- dt05 %>% 
+  filter(strata == 'early suppressions - cephia') %>% 
+  mutate(direction = ifelse(z_stat <0, 'neg', 'pos')) %>% 
+  dplyr::select(direction, y_hat_status) %>% 
+  tbl_summary(y_hat_status)
+table(x1$y_hat_status, x1$direction)
+
 dt06 <- dt05 %>%
   dplyr::select(strata, y_hat_status) %>%
+  filter(strata != 'early suppressions - cephia')
   tbl_summary(by = strata
     )
 dt06
@@ -552,16 +567,12 @@ ggplot_plots <- ggpubr::ggarrange(
   
   ggplot(dataset_ggplot, 
          aes(x = time, y = value, group = individual)) +
-    geom_line(size = 1) +
-    # scale_size_manual(values = c("bold" = 1.5, "faint" = 0.5, )) +
-    # scale_color_manual(values = c("bold" = "black", "faint" = "gray80")) +
-    geom_line(alpha = 0.5) +
-    labs(#title = "Exponential Decay Curves for Individuals",
+    geom_line(size = 1, alpha = 0.5) +
+    labs(
       x = "Time since ART start (years)",
       y = "Estimated ODn Value")  +
     scale_y_continuous(limits = c(0, max(dataset_ggplot$value))) +
     scale_x_continuous(limits = c(0, max(dataset_ggplot$time))) +
-    # theme_classic() +
     theme(
       text = element_text(size = 20),
       plot.title = element_text(hjust = 0.5),
