@@ -523,3 +523,59 @@ accuracy_graph <- data.frame(accuracy_dataset) %>%
     # axis.text.x = element_text(angle = 60, hjust = 1)
   )
 accuracy_graph
+
+dataset_ggplot <- decay_data %>%
+  filter(individual %in% sample(length(unique(decay_data$individual)), 100, replace = F)) 
+
+ggplot_plots <- ggpubr::ggarrange( 
+  ggplot(full_dataset %>%
+           filter(Group == 'early suppressions'), 
+         aes(x = years_since_tx_start, y = sedia_ODn, group = subject_label_blinded, color = subject_label_blinded)) +
+    geom_line(size = 1.5) +
+    # geom_line(alpha = 0.5) +
+    labs(#title = "Exponential Decay Curves for Individuals",
+      x = "Time since ART start (years)",
+      y = "ODn Value") +
+    # theme_classic() +
+    theme(
+      text = element_text(size = 20),
+      plot.title = element_text(hjust = 0.5),
+      axis.line = element_line(colour = "black"),
+      axis.text = element_text(size = 18),
+      axis.title = element_text(size = 18),
+      panel.background = element_blank(),
+      panel.border = element_blank(),
+      plot.margin = unit(c(0, 0, 0, 0), "null"),
+      legend.position = "none"
+    ),
+  
+  
+  ggplot(dataset_ggplot, 
+         aes(x = time, y = value, group = individual)) +
+    geom_line(size = 1) +
+    # scale_size_manual(values = c("bold" = 1.5, "faint" = 0.5, )) +
+    # scale_color_manual(values = c("bold" = "black", "faint" = "gray80")) +
+    geom_line(alpha = 0.5) +
+    labs(#title = "Exponential Decay Curves for Individuals",
+      x = "Time since ART start (years)",
+      y = "Estimated ODn Value")  +
+    scale_y_continuous(limits = c(0, max(dataset_ggplot$value))) +
+    scale_x_continuous(limits = c(0, max(dataset_ggplot$time))) +
+    # theme_classic() +
+    theme(
+      text = element_text(size = 20),
+      plot.title = element_text(hjust = 0.5),
+      axis.line = element_line(colour = "black"),
+      axis.text = element_text(size = 18),
+      axis.title = element_text(size = 18),
+      panel.background = element_blank(),
+      panel.border = element_blank(),
+      plot.margin = unit(c(0, 0, 0, 0), "null"),
+      legend.position = "none"
+    ),
+  labels = c("A", "B"),
+  ncol = 1, nrow = 2
+)
+jpeg('other_figures/EDCTP_figure_second_objective.jpeg', units = "in", width = 9, height = 9, res = 300)
+ggplot_plots
+dev.off()
