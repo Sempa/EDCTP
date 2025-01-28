@@ -425,7 +425,7 @@ dt05 <- as.data.frame(results1) %>%
     mutate(record_id = as.numeric(as.factor(subject_label_blinded))), by = 'record_id') %>%
   dplyr::select(names(as.data.frame(results1)), strata) %>%
   distinct(record_id, .keep_all = T) %>%
-  mutate(y_hat_status = as.factor(ifelse(p_value < 0.05, 1, 2)),
+  mutate(y_hat_status = as.factor(ifelse(p_value < 0.05 & z_stat < 0, 1, 2)),
          y = as.factor(ifelse(strata == 'early suppressions', 1, 2)) )
 
 x <- dt05 %>% 
@@ -433,18 +433,18 @@ x <- dt05 %>%
   mutate(direction = ifelse(z_stat <0, 'neg', 'pos')) %>% 
   dplyr::select(direction, y_hat_status) %>% 
   tbl_summary(y_hat_status)
-table(x$y_hat_status, x$direction)
+# table(x$y_hat_status, x$direction)
 
 x1 <- dt05 %>% 
   filter(strata == 'early suppressions - cephia') %>% 
   mutate(direction = ifelse(z_stat <0, 'neg', 'pos')) %>% 
   dplyr::select(direction, y_hat_status) %>% 
   tbl_summary(y_hat_status)
-table(x1$y_hat_status, x1$direction)
+# table(x1$y_hat_status, x1$direction)
 
 dt06 <- dt05 %>%
   dplyr::select(strata, y_hat_status) %>%
-  filter(strata != 'early suppressions - cephia')
+  # filter(strata != 'early suppressions - cephia') %>%
   tbl_summary(by = strata
     )
 dt06
