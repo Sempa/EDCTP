@@ -8,6 +8,8 @@ library(nlme)
 library(splines)
 library(cowplot)
 library(distributions3)
+library("gghighlight")
+library(brolgar)
 
 sediaData_full <- read_csv("data/JHU/CEPHIA - JHU LAg-Avidity Data.csv")
 
@@ -240,12 +242,17 @@ model_parameters <- bind_cols(id = 1:n_individuals,
                               remove_rownames(data.frame(t(data.frame(decay_rates[c(22,23,24),])))) %>%
                                 dplyr::select(a = X1, b = X2, c = X3))
 
-ggplot(decay_data, aes(x = time, y = value, group = individual)) +
-  geom_line(alpha = 0.5) +
+ggplot(decay_data %>%
+         mutate(flag = as.logical(ifelse(individual %in% sample(n_individuals, 100, replace = F), 1, 0))), 
+       aes(x = time, y = value, group = individual, color = flag)) +
+  geom_line(alpha = 0.5, linewidth = 1.5) +
+  gghighlight(flag, use_direct_label = FALSE, unhighlighted_colour = "grey70") +
+  scale_color_manual(values = c("FALSE" = "grey70", "TRUE" = "black")) +
   labs(title = "Exponential Decay Curves for Individuals",
        x = "Time since ART start (years)",
        y = "ODn Value") +
-  theme_minimal()
+  theme_minimal() +
+  theme(legend.position="none")
 
 ###########################################################
 ##getting data to use for testing - CEPHIA EDCTP data
