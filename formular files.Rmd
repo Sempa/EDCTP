@@ -1,0 +1,60 @@
+---
+title: "Joint Model Formula and Description"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Joint Model for Longitudinal and Survival Data
+
+### Longitudinal Submodel
+
+The longitudinal process is modeled using a linear mixed-effects model:
+
+$$
+Y_i(t) = X_i(t)\beta + Z_i(t)b_i + \epsilon_i(t), \quad \epsilon_i(t) \sim N(0, \sigma^2)
+$$
+
+where:
+- \( Y_i(t) \) is the observed longitudinal outcome for subject \( i \) at time \( t \),
+- \( X_i(t) \) is the design matrix for fixed effects with coefficient vector \( \beta \),
+- \( Z_i(t) \) is the design matrix for random effects with individual-specific random effects \( b_i \),
+- \( \epsilon_i(t) \) is the residual error, assumed to follow a normal distribution with variance \( \sigma^2 \).
+
+### Survival Submodel
+
+The survival process is modeled using a Cox proportional hazards model, where the hazard function is:
+
+$$
+ h_i(t) = h_0(t) \exp(W_i \gamma + \alpha m_i(t))
+$$
+
+where:
+- \( h_0(t) \) is the baseline hazard function,
+- \( W_i \) is the vector of baseline covariates with associated coefficients \( \gamma \),
+- \( m_i(t) \) represents the true (unobserved) longitudinal outcome,
+- \( \alpha \) is the association parameter linking the longitudinal and survival processes.
+
+### Joint Model Framework
+
+The joint model combines the above submodels by linking the longitudinal outcome to the hazard function via the true underlying trajectory \( m_i(t) \). This approach accounts for measurement error and provides a more accurate estimate of the relationship between the longitudinal and survival processes.
+
+### Implementation in R
+
+To fit a joint model in R, we can use the `JM` or `joineR` package. For example:
+
+```{r, eval=FALSE}
+library(JM)
+fit_lme <- lme(Y ~ time + covariates, random = ~ time | ID, data = long_data)
+fit_surv <- coxph(Surv(time, event) ~ covariates, data = surv_data)
+fit_joint <- jointModel(fit_lme, fit_surv, timeVar = "time", method = "weibull-PH")
+summary(fit_joint)
+```
+
+This code fits a joint model where the longitudinal trajectory is linked to survival through a shared parameter model.

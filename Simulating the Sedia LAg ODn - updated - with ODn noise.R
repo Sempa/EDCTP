@@ -78,7 +78,7 @@ cephia_samples <- read_csv("Sempa_final_pull_with_results.csv") %>%
     to_peak = NA
   ) %>%
   select(subject_label_blinded, days_since_eddi, `days since tx start`,
-         Sex = BiologicalSex,
+         Sex = BiologicalSex,# Subtype,
          Age = `Age at Draw`, test_date, sedia_ODn, viral_load, visits, Group, to_peak
   )
 full_dataset <- bind_rows(
@@ -242,17 +242,85 @@ model_parameters <- bind_cols(id = 1:n_individuals,
                               remove_rownames(data.frame(t(data.frame(decay_rates[c(22,23,24),])))) %>%
                                 dplyr::select(a = X1, b = X2, c = X3))
 
-ggplot(decay_data %>%
-         mutate(flag = as.logical(ifelse(individual %in% sample(n_individuals, 100, replace = F), 1, 0))), 
-       aes(x = time, y = value, group = individual, color = flag)) +
-  geom_line(alpha = 0.5, linewidth = 1.5) +
-  gghighlight(flag, use_direct_label = FALSE, unhighlighted_colour = "grey70") +
-  scale_color_manual(values = c("FALSE" = "grey70", "TRUE" = "black")) +
-  labs(title = "Exponential Decay Curves for Individuals",
-       x = "Time since ART start (years)",
-       y = "ODn Value") +
-  theme_minimal() +
-  theme(legend.position="none")
+
+x <- full_dataset %>%
+  group_by(subject_label_blinded) %>%
+  arrange(subject_label_blinded, years_since_tx_start) %>%
+  mutate(visits = 1:length(subject_label_blinded),
+         max_visits = max(visits)) %>%
+  filter(Group == 'early suppressions') %>%
+  distinct(subject_label_blinded, .keep_all = T)
+x2 = cephia_samples %>%
+  distinct(subject_label_blinded, .keep_all = T)
+
+dataset_ggplot <- decay_data %>%
+  filter(individual %in% sample(length(unique(decay_data$individual)), 100, replace = F)) 
+set.seed(11)
+ggplot_plots <- ggpubr::ggarrange( 
+  ggplot(full_dataset %>%
+           filter(Group == 'early suppressions'), 
+         aes(x = years_since_tx_start, y = sedia_ODn, group = subject_label_blinded, color = subject_label_blinded)) +
+    geom_line(size = 1.5) +
+    # geom_line(alpha = 0.5) +
+    labs(#title = "Exponential Decay Curves for Individuals",
+      x = "Time since ART start (years)",
+      y = "ODn Value") +
+    # theme_classic() +
+    theme(
+      text = element_text(size = 20),
+      plot.title = element_text(hjust = 0.5),
+      axis.line = element_line(colour = "black"),
+      axis.text = element_text(size = 18),
+      axis.title = element_text(size = 18),
+      panel.background = element_blank(),
+      panel.border = element_blank(),
+      plot.margin = unit(c(0, 0, 0, 0), "null"),
+      legend.position = "none"
+    ),
+  
+  
+  ggplot(decay_data %>%
+           mutate(flag = as.logical(ifelse(individual %in% sample(n_individuals, 50, replace = F), 1, 0))), 
+         aes(x = time, y = value, group = individual, color = flag)) +
+    geom_line(alpha = 0.5, linewidth = 1.5) +
+    gghighlight(flag, use_direct_label = FALSE, unhighlighted_colour = "grey70") +
+    scale_color_manual(values = c("FALSE" = "grey70", "TRUE" = "black")) +
+    labs(#title = "Exponential Decay Curves for Individuals",
+      x = "Time since ART start (years)",
+      y = "Estimated ODn Value")  +
+    scale_y_continuous(limits = c(0, max(dataset_ggplot$value))) +
+    scale_x_continuous(limits = c(0, max(dataset_ggplot$time))) +
+    # theme_classic() +
+    theme(
+      text = element_text(size = 20),
+      plot.title = element_text(hjust = 0.5),
+      axis.line = element_line(colour = "black"),
+      axis.text = element_text(size = 18),
+      axis.title = element_text(size = 18),
+      panel.background = element_blank(),
+      panel.border = element_blank(),
+      plot.margin = unit(c(0, 0, 0, 0), "null"),
+      legend.position = "none"
+    ),
+  labels = c("A", "B"),
+  ncol = 1, nrow = 2
+)
+
+# ggplot(decay_data %>%
+#          mutate(flag = as.logical(ifelse(individual %in% sample(n_individuals, 50, replace = F), 1, 0))), 
+#        aes(x = time, y = value, group = individual, color = flag)) +
+#   geom_line(alpha = 0.5, linewidth = 1.5) +
+#   gghighlight(flag, use_direct_label = FALSE, unhighlighted_colour = "grey70") +
+#   scale_color_manual(values = c("FALSE" = "grey70", "TRUE" = "black")) +
+#   labs(title = "Exponential Decay Curves for Individuals",
+#        x = "Time since ART start (years)",
+#        y = "ODn Value") +
+#   theme_minimal() +
+#   theme(legend.position="none")
+
+jpeg('other_figures/simulated_plot.jpeg', units = "in", width = 9, height = 9, res = 300)
+ggplot_plots
+dev.off()
 
 ###########################################################
 ##getting data to use for testing - CEPHIA EDCTP data
