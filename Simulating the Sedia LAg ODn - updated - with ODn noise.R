@@ -242,6 +242,7 @@ model_parameters <- bind_cols(id = 1:n_individuals,
                               remove_rownames(data.frame(t(data.frame(decay_rates[c(22,23,24),])))) %>%
                                 dplyr::select(a = X1, b = X2, c = X3))
 
+saveRDS(model_parameters, 'data/Exponential.rds')
 
 x <- full_dataset %>%
   group_by(subject_label_blinded) %>%
@@ -318,7 +319,7 @@ ggplot_plots <- ggpubr::ggarrange(
 #   theme_minimal() +
 #   theme(legend.position="none")
 
-jpeg('other_figures/simulated_plot.jpeg', units = "in", width = 9, height = 9, res = 300)
+jpeg('other_figures/simulated_plot - exponential.jpeg', units = "in", width = 9, height = 9, res = 300)
 ggplot_plots
 dev.off()
 
@@ -387,10 +388,14 @@ best_model_choice <- function(test_data, param_sim_data) {
   # stopifnot(length(dt1$baselines) == 0)
   dt2 <- dt1 %>%
     rowwise() %>%
-    mutate(#mse = sum(c_across(starts_with("absolute_error")))/length(ODn_vec)
-      rmse = sqrt(mean(c_across(starts_with("square_error"))))) %>%
+    mutate(
+      rmse = sqrt(mean(c_across(starts_with("square_error"))))
+    ) %>%
     ungroup() %>%
-    mutate(min_slope = min(rmse)) %>%
+    mutate(
+      baselines = as.numeric(baselines),  # <-- Add this line
+      min_slope = min(rmse)
+    ) %>%
     filter(rmse == min(rmse)) %>%
     dplyr::select(id, baselines, a, b, c, rmse)
   return(dt2)
@@ -399,6 +404,7 @@ best_model_choice <- function(test_data, param_sim_data) {
 results <- c()
 ids <- unique(test_data$record_id)
 for (i in 1:length(unique(test_data$record_id))) {
+  # print(ids[i])
   best_model_parameters <- best_model_choice(test_data = test_data %>% 
                                                filter(is.na(peak_visit)) %>%
                                                filter(record_id == ids[i]), 
@@ -457,7 +463,7 @@ compare_value_with_others <- function(data_set, t, y_ODn, sigma_ODn, sigma_y_ODn
   z_test <- (y - y_hat) / sigma_pooled
   set.seed(11)
   Z <- Normal(0, 1) # make a standard normal r.v.
-  p_value <- 1 - cdf(Z, abs(z_test)) + cdf(Z, -abs(z_test))
+  p_value <- 1 - pnorm(z_test) #2 * (1 - cdf(Z, abs(z_test)))
   results <- cbind(id = data_set$id, value = y, z_stat = z_test, p_value = p_value, record_id = id) # value = y,
   return(results)
 }
