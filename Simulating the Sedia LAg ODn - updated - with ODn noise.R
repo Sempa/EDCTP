@@ -370,48 +370,125 @@ test_data <- bind_rows(
   dplyr::select(record_id = id, time_vec = years_since_ART_start, 
                 ODn_vec = sedia_ODn, peak_visit = peak)
 
-best_model_choice <- function(test_data, param_sim_data) {
-  # browser()
-  time_vec <- test_data[,2]
-  ODn_vec <- test_data[,3]
-  dt <- model_parameters
-  a <- model_parameters$a
-  b <- model_parameters$b
-  c <- model_parameters$c
-  for (i in 1:length(ODn_vec[[1]])) {
-    t <- time_vec[[i,1]]
-    y <- ODn_vec[[i,1]]
-    dt[[paste0("square_error", i)]] <- (y - pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001))^2
+# best_model_choice <- function(test_data, param_sim_data) {
+#   # browser()
+#   time_vec <- test_data[,2]
+#   ODn_vec <- test_data[,3]
+#   dt <- model_parameters
+#   a <- model_parameters$a
+#   b <- model_parameters$b
+#   c <- model_parameters$c
+#   for (i in 1:length(ODn_vec[[1]])) {
+#     t <- time_vec[[i,1]]
+#     y <- ODn_vec[[i,1]]
+#     dt[[paste0("square_error", i)]] <- (y - pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001))^2
+#   }
+#   # browser()
+#   dt1 <- dt[!is.infinite(rowSums(dt)),]
+#   # stopifnot(length(dt1$baselines) == 0)
+#   dt2 <- dt1 %>%
+#     rowwise() %>%
+#     mutate(
+#       rmse = sqrt(mean(c_across(starts_with("square_error"))))
+#     ) %>%
+#     ungroup() %>%
+#     mutate(
+#       baselines = as.numeric(baselines),  # <-- Add this line
+#       min_slope = min(rmse)
+#     ) %>%
+#     filter(rmse == min(rmse)) %>%
+#     dplyr::select(id, baselines, a, b, c, rmse)
+#   return(dt2)
+# }
+
+# results <- c()
+# ids <- unique(test_data$record_id)
+# for (i in 1:length(unique(test_data$record_id))) {
+#   # print(ids[i])
+#   best_model_parameters <- best_model_choice(test_data = test_data %>% 
+#                                                filter(is.na(peak_visit)) %>%
+#                                                filter(record_id == ids[i]), 
+#                                              param_sim_data = model_parameters)
+#   results <- rbind(results, best_model_parameters)
+# }
+best_model_choice <- function(test_data, param_sim_data, baselines) {
+  time_vec <- test_data[, 2]
+  ODn_vec <- test_data[, 3]
+  
+  dt <- param_sim_data
+  a <- dt$a
+  b <- dt$b
+  c <- dt$c
+  
+  # Loop over each timepoint
+  for (i in 1:nrow(test_data)) {
+    t <- time_vec[[i, 1]]
+    y <- ODn_vec[[i, 1]]
+    pred <- pmax(baselines * exp(-(a * t^2 + b * t + c) * t), 0.001)
+    dt[[paste0("squared_error", i)]] <- (y - pred)^2
+    dt[[paste0("abs_error", i)]] <- abs(y - pred)
   }
-  # browser()
-  dt1 <- dt[!is.infinite(rowSums(dt)),]
-  # stopifnot(length(dt1$baselines) == 0)
-  dt2 <- dt1 %>%
+  
+  # Filter out rows with non-finite values
+  dt_clean <- dt[!is.infinite(rowSums(dt %>% dplyr::select(starts_with("squared_error")))), ]
+  
+  # Compute RMSE and MAE
+  dt_scores <- dt_clean %>%
     rowwise() %>%
     mutate(
-      rmse = sqrt(mean(c_across(starts_with("square_error"))))
+      rmse = sqrt(mean(c_across(starts_with("squared_error")))),
+      mae = mean(c_across(starts_with("abs_error"))),
+      complexity = abs(a) + abs(b) + abs(c)
     ) %>%
-    ungroup() %>%
-    mutate(
-      baselines = as.numeric(baselines),  # <-- Add this line
-      min_slope = min(rmse)
-    ) %>%
-    filter(rmse == min(rmse)) %>%
-    dplyr::select(id, baselines, a, b, c, rmse)
-  return(dt2)
+    ungroup()
+  
+  # Step 1: Filter for lowest RMSE
+  min_rmse <- min(dt_scores$rmse)
+  dt_min_rmse <- dt_scores %>% filter(rmse == min_rmse)
+  
+  # Step 2: If ties, use MAE
+  if (nrow(dt_min_rmse) > 1) {
+    min_mae <- min(dt_min_rmse$mae)
+    dt_min_rmse <- dt_min_rmse %>% filter(mae == min_mae)
+  }
+  
+  # Step 3: If still ties, use lowest model complexity
+  if (nrow(dt_min_rmse) > 1) {
+    min_complexity <- min(dt_min_rmse$complexity)
+    dt_min_rmse <- dt_min_rmse %>% filter(complexity == min_complexity)
+  }
+  
+  # Step 4: Still ties? Pick one randomly
+  if (nrow(dt_min_rmse) > 1) {
+    set.seed(11)
+    dt_min_rmse <- dt_min_rmse[sample(1:nrow(dt_min_rmse), 1), ]
+  }
+  
+  # Final selection
+  return(dt_min_rmse %>% dplyr::select(id, baselines, a, b, c, rmse, mae))
 }
 
-results <- c()
+
+results <- list()
 ids <- unique(test_data$record_id)
-for (i in 1:length(unique(test_data$record_id))) {
-  # print(ids[i])
-  best_model_parameters <- best_model_choice(test_data = test_data %>% 
-                                               filter(is.na(peak_visit)) %>%
-                                               filter(record_id == ids[i]), 
-                                             param_sim_data = model_parameters)
-  results <- rbind(results, best_model_parameters)
+
+for (i in seq_along(ids)) {
+  individual_data <- test_data %>%
+    filter(is.na(peak_visit)) %>%
+    filter(record_id == ids[i])
+  
+  best_model_parameters <- best_model_choice(
+    test_data = individual_data,
+    param_sim_data = model_parameters,
+    baselines = model_parameters$baselines
+  )
+  
+  results[[i]] <- best_model_parameters
 }
-results <- results %>%
+
+results_df <- do.call(rbind, results)
+
+results <- results_df %>%
   mutate(record_id = ids)
 head(results)
 saveRDS(results, 'results_100k.rds')

@@ -189,57 +189,58 @@ n_individuals <- 10000
 # Time points (6-month intervals over 10 years)
 time_points <- seq(0, 10, by = 0.5)
 
-# Define the distributions for baseline
+# Baseline ODn values (truncated normal)
 baseline_mean <- 3.47
 baseline_sd <- 1.55
 baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.001, b = 5)
 
-# Define a two-degree polynomial to generate decay parameters
-generate_decay_rate <- function(t) {
-  # browser()
-  # Two-degree polynomial: a*t^2 + b*t + c
-  a <- rnorm(1, mean = fixed_effects[3,1], sd = fixed_effects[3,2])#1.818730
-  b <- rnorm(1, mean = fixed_effects[2,1], sd = fixed_effects[2,2])#-8.97018
-  c <- rnorm(1, mean = fixed_effects[1,1], sd = fixed_effects[1,2])#3.254208
-  decay_rate <- a * t^2 + b * t + c
-  return(c(pmax(decay_rate, 0.05), a, b, c))  # Ensure decay rates are non-negative
+# Function to generate Weibull decay parameters: λ from 2-degree polynomial, and shape k
+generate_weibull_params <- function(t) {
+  a <- rnorm(1, mean = fixed_effects[3,1], sd = fixed_effects[3,2])
+  b <- rnorm(1, mean = fixed_effects[2,1], sd = fixed_effects[2,2])
+  c <- rnorm(1, mean = fixed_effects[1,1], sd = fixed_effects[1,2])
+  lambda <- pmax(a * t^2 + b * t + c, 0.05)  # scale parameter, non-negative
+  k <- rnorm(1, mean = 1.5, sd = 0.3)        # shape parameter (usually >0)
+  return(c(lambda, a, b, c, k))
 }
 
-# Generate decay rates for each individual
-decay_rates <- sapply(1:n_individuals, function(i) {
-  # browser()
-  generate_decay_rate(time_points)  # Each individual has a unique decay rate
+# Generate Weibull parameters for each individual
+decay_params <- sapply(1:n_individuals, function(i) {
+  generate_weibull_params(time_points)
 })
 
-# Define the exponential decay function
-exp_decay <- function(t, baseline, decay_rate) {
-  pmax(baseline * exp(-decay_rate * t), .001)  # Ensure positive ODn values
+# Weibull decay function
+weibull_decay <- function(t, baseline, lambda, shape) {
+  pmax(baseline * exp(-(lambda * t)^shape), 0.001)
 }
 
-# Define measurement noise as a function of ODn
-sigma_0 <- -0.01469  # Example intercept for noise model
-slope_sigma <- 0.14513  # Example slope
+# Noise model
+sigma_0 <- -0.01469
+slope_sigma <- 0.14513
 
-# Function to compute noise SD based on ODn value
 compute_noise_sd <- function(odn) {
-  pmax(sigma_0 + slope_sigma * odn, 0.01)  # Ensure non-negative SD
+  pmax(sigma_0 + slope_sigma * odn, 0.01)
 }
 
-# Generate decay data with heteroskedastic noise
+# Simulate longitudinal data
 decay_data <- data.frame(time = rep(time_points, n_individuals),
                          individual = rep(1:n_individuals, each = length(time_points)),
                          value = unlist(lapply(1:n_individuals, function(i) {
-                           expected_odn <- exp_decay(time_points, baselines[i], decay_rates[1:length(time_points), i])
+                           lambda <- decay_params[1:length(time_points), i]
+                           shape <- decay_params[5, i]
+                           expected_odn <- weibull_decay(time_points, baselines[i], lambda, shape)
                            noise_sd <- sapply(expected_odn, compute_noise_sd)
                            noisy_odn <- pmax(rnorm(length(expected_odn), mean = expected_odn, sd = noise_sd), 0.001)
                            return(noisy_odn)
                          })))
 
+# Model parameters summary table
 model_parameters <- bind_cols(id = 1:n_individuals,
                               baseline = as.data.frame(baselines), 
-                              remove_rownames(data.frame(t(data.frame(decay_rates[c(22,23,24),])))) %>%
-                                dplyr::select(a = X1, b = X2, c = X3))
-saveRDS(model_parameters, 'data/Exponential-brm.rds')
+                              remove_rownames(data.frame(t(data.frame(decay_params[c(2,3,4,5),])))) %>%
+                                dplyr::select(a = X1, b = X2, c = X3, shape = X4))
+
+saveRDS(model_parameters, 'data/weibull-brm.rds')
 
 x <- full_dataset %>%
   group_by(subject_label_blinded) %>%
@@ -304,6 +305,6 @@ ggplot_plots <- ggpubr::ggarrange(
   ncol = 1, nrow = 2
 )
 
-jpeg('other_figures/simulated_plot - exponential - brm.jpeg', units = "in", width = 9, height = 9, res = 300)
+jpeg('other_figures/simulated_plot - weibull - brm.jpeg', units = "in", width = 9, height = 9, res = 300)
 ggplot_plots
 dev.off()
