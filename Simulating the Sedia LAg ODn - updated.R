@@ -9,6 +9,28 @@ library(splines)
 library(cowplot)
 library(distributions3)
 
+# extract_sedia_data <- read_delim("~/GitHub/biomarker-growth-curves/data/Dataset_extract_LAgSedia.csv",
+#                                  ",",
+#                                  escape_double = FALSE, trim_ws = TRUE
+# )
+# 
+# plot_ODnTime <- ggplot() +
+#   geom_point(data = extract_sedia_data, aes(x = days_since_eddi, y = result), color = 'black') +
+#   xlab("Time since infection (days)") + ylab("LAg ODn") +
+#   theme_bw() + scale_x_continuous(limits = c(0, 5000), breaks = c(seq(0, 5000, 1000)), expand = c(0, 0)) +
+#   scale_y_continuous(limits = c(0, 8), breaks = c(seq(0, 8, 1)), expand = c(0, 0)) +
+#   theme(
+#     text = element_text(size = 18),
+#     plot.title = element_text(hjust = 0.5),
+#     axis.line = element_line(colour = "black"),# panel.grid.major = element_blank(),
+#     #panel.grid.minor = element_blank(),
+#     panel.background = element_blank(),
+#     panel.border = element_blank(),
+#     aspect.ratio = 1
+#   )
+# plot_ODnTime
+# ggsave('./other_figures/LAgODnTime.tiff', width = 10, height = 8, pointsize = 12)
+
 sediaData_full <- read_csv("data/JHU/CEPHIA - JHU LAg-Avidity Data.csv")
 
 sediaData <- sediaData_full %>%
@@ -183,7 +205,7 @@ time_points <- seq(0, 10, by = 0.5)
 # Define the distributions for baseline
 baseline_mean <- 3.47
 baseline_sd <- 1.55
-baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.001, b = 5)
+baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.03, b = 7.4)
 
 # Define a two-degree polynomial to generate decay parameters
 generate_decay_rate <- function(t) {

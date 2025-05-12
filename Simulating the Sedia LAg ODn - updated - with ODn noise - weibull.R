@@ -14,7 +14,7 @@ time_points <- seq(0, 10, by = 0.5)
 # Define the distributions for baseline
 baseline_mean <- 3.47
 baseline_sd <- 1.55
-baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.001, b = 5)
+baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.03, b = 7.4)
 
 # Function to generate Weibull parameters from a two-degree polynomial
 generate_weibull_params <- function(t) {

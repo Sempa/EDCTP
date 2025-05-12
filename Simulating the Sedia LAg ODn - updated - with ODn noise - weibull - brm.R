@@ -192,7 +192,7 @@ time_points <- seq(0, 10, by = 0.5)
 # Baseline ODn values (truncated normal)
 baseline_mean <- 3.47
 baseline_sd <- 1.55
-baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.001, b = 5)
+baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.03, b = 7.4)
 
 # Function to generate Weibull decay parameters: λ from 2-degree polynomial, and shape k
 generate_weibull_params <- function(t) {
