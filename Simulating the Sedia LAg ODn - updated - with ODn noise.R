@@ -10,6 +10,7 @@ library(cowplot)
 library(distributions3)
 library("gghighlight")
 library(brolgar)
+library(glmmTMB)
 
 sediaData_full <- read_csv("data/JHU/CEPHIA - JHU LAg-Avidity Data.csv")
 
@@ -157,17 +158,32 @@ sd(c(baseline_ODn_table$sedia_ODn, baseline_ODn_data$ODn))
 #                   random = ~ days_since_eddi|subject_label_blinded,
 #                   na.action = na.omit)
 # summary(model_eddi)
+# ploy_model <- nlme::lme(sedia_ODn ~ poly(years_since_tx_start, 2), 
+#                         data = full_dataset %>%
+#                           filter(Group == 'early suppressions'), 
+#                         random = ~years_since_tx_start|subject_label_blinded,
+#                         na.action = na.omit)
+simple_model <- lm(sedia_ODn ~ years_since_tx_start, 
+                   data = full_dataset %>%
+                     mutate(sedia_ODn = log(sedia_ODn)))
 
-poly_model <- nlme::lme(sedia_ODn ~ poly(years_since_tx_start, 2), 
-                        data = full_dataset %>%
-                          filter(Group == 'early suppressions'), 
-                        random = ~years_since_tx_start|subject_label_blinded,
-                        na.action = na.omit)
+# Get the coefficients
+start_values <- coef(simple_model)
+
+# Use the coefficients as starting values
+poly_model <- glmmTMB(
+  sedia_ODn ~ years_since_tx_start + (1 | subject_label_blinded),
+  family = gaussian(link = "log"),
+  data = full_dataset,
+  start = list(beta = c(0, 1))
+)
+coef_estimates <- coefs[, "Estimate"]
+coef_se <- coefs[, "Std. Error"]
 summary(poly_model)
-summary(poly_model)$tTable[,2][[1]]
-sd_fixed <- c(summary(poly_model)$tTable[,2][[1]], 
-              summary(poly_model)$tTable[,2][[2]],
-              summary(poly_model)$tTable[,2][[3]]) * sqrt(length(unique(sedia_eddi_data$subject_label_blinded)))
+# summary(poly_model)$tTable[,2][[1]]
+# sd_fixed <- c(summary(poly_model)$tTable[,2][[1]], 
+#               summary(poly_model)$tTable[,2][[2]],
+#               summary(poly_model)$tTable[,2][[3]]) * sqrt(length(unique(sedia_eddi_data$subject_label_blinded)))
 
 #################################################################################
 ####individual decay rates
@@ -191,14 +207,10 @@ baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = bas
 generate_decay_rate <- function(t) {
   # browser()
   # Two-degree polynomial: a*t^2 + b*t + c
-  a <- rnorm(1, mean = summary(poly_model)$tTable[,1][[3]], 
-             sd = summary(poly_model)$tTable[,2][[3]] * sqrt(length(unique(sedia_eddi_data$subject_label_blinded))))#1.818730
-  b <- rnorm(1, mean = summary(poly_model)$tTable[,1][[2]], 
-             sd = summary(poly_model)$tTable[,2][[2]] * sqrt(length(unique(sedia_eddi_data$subject_label_blinded))))#-8.97018
-  c <- rnorm(1, mean = summary(poly_model)$tTable[,1][[1]], 
-             sd = summary(poly_model)$tTable[,2][[1]] * sqrt(length(unique(sedia_eddi_data$subject_label_blinded))))#3.254208
-  decay_rate <- a * t^2 + b * t + c
-  return(c(pmax(decay_rate, 0.05), a, b, c))  # Ensure decay rates are non-negative
+  a <- rnorm(1, mean = coef_estimates[[1]], sd = coef_se[[1]])#1.818730
+  b <- rnorm(1, mean = coef_estimates[[2]], sd = coef_se[[2]])#-8.97018
+  decay_rate <- a + b * t
+  return(c(pmax(decay_rate, 0.05), a, b))  # Ensure decay rates are non-negative
 }
 
 # Generate decay rates for each individual
