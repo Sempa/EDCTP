@@ -163,13 +163,6 @@ sd(c(baseline_ODn_table$sedia_ODn, baseline_ODn_data$ODn))
 #                           filter(Group == 'early suppressions'), 
 #                         random = ~years_since_tx_start|subject_label_blinded,
 #                         na.action = na.omit)
-simple_model <- lm(sedia_ODn ~ years_since_tx_start, 
-                   data = full_dataset %>%
-                     mutate(sedia_ODn = log(sedia_ODn)))
-
-# Get the coefficients
-start_values <- coef(simple_model)
-
 # Use the coefficients as starting values
 poly_model <- glmmTMB(
   sedia_ODn ~ years_since_tx_start + (1 | subject_label_blinded),
@@ -177,6 +170,7 @@ poly_model <- glmmTMB(
   data = full_dataset,
   start = list(beta = c(0, 1))
 )
+coefs <- summary(poly_model)$coefficients$cond
 coef_estimates <- coefs[, "Estimate"]
 coef_se <- coefs[, "Std. Error"]
 summary(poly_model)
@@ -251,8 +245,8 @@ decay_data <- data.frame(time = rep(time_points, n_individuals),
 
 model_parameters <- bind_cols(id = 1:n_individuals,
                               baseline = as.data.frame(baselines), 
-                              remove_rownames(data.frame(t(data.frame(decay_rates[c(22,23,24),])))) %>%
-                                dplyr::select(a = X1, b = X2, c = X3))
+                              remove_rownames(data.frame(t(data.frame(decay_rates[c(22,23),])))) %>%
+                                dplyr::select(a = X1, b = X2))
 
 saveRDS(model_parameters, 'data/Exponential.rds')
 
