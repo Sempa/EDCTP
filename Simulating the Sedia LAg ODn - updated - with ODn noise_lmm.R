@@ -1,0 +1,404 @@
+simulate_ODn_decay <- function(coef_estimates, coef_se,
+                               n_individuals,
+                               baseline_mean, baseline_sd,
+                               sigma_0, slope_sigma,
+                               baseline_noise, fraction,
+                               max_follow_up = 10,
+                               time_interval = 0.5,
+                               noise_model = 1,
+                               failure_prob = 0.2,
+                               dropout_prob = 0.1) {
+  library(truncnorm)
+  library(dplyr)
+  
+  full_time_points <- seq(0, max_follow_up, by = time_interval)
+  
+  baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.03, b = 7.4)
+  
+  fail_flags <- runif(n_individuals) < failure_prob
+  fail_times <- ifelse(fail_flags, runif(n_individuals, min = 1, max = max_follow_up), NA)
+  
+  dropout_flags <- ifelse(!fail_flags, runif(n_individuals) < dropout_prob, FALSE)
+  dropout_times <- ifelse(dropout_flags, runif(n_individuals, min = 1, max = max_follow_up), NA)
+  
+  # Fixed decay rate per individual
+  generate_decay_rate <- function() {
+    a <- rnorm(1, mean = coef_estimates[[1]], sd = coef_se[[1]])
+    b <- rnorm(1, mean = coef_estimates[[2]], sd = coef_se[[2]])
+    decay_rate <- max(a + b * 0, 0.05)  # fixed at baseline
+    return(c(decay_rate, a, b))
+  }
+  
+  # Nonlinear decay function
+  exp_decay <- function(t, baseline, decay_rate) {
+    pmax(baseline / (1 + decay_rate * t), 0.001)
+  }
+  
+  exp_rebound <- function(start_value, t, rebound_rate) {
+    rebound <- start_value * exp(rebound_rate * (t - t[1]))
+    pmax(rebound, 0.001)
+  }
+  
+  compute_noise_sd1 <- function(odn) pmax(sigma_0 + slope_sigma * odn, 0.01)
+  compute_noise_sd2 <- function(odn) pmax(baseline_noise + fraction * odn, 0.01)
+  
+  decay_data_list <- vector("list", n_individuals)
+  decay_params <- matrix(NA, n_individuals, 2)
+  rebound_rate_vector <- rep(NA, n_individuals)
+  censor_time_vec <- rep(NA, n_individuals)
+  treatment_failure_vector <- rep(FALSE, n_individuals)
+  follow_up_years <- rep(NA, n_individuals)
+  
+  for (i in 1:n_individuals) {
+    baseline <- baselines[i]
+    has_failed <- fail_flags[i]
+    fail_time <- fail_times[i]
+    
+    if (has_failed) {
+      times <- seq(0, fail_time + time_interval, by = time_interval)
+      censor_time <- max(times)
+    } else if (dropout_flags[i]) {
+      times <- seq(0, dropout_times[i], by = time_interval)
+      censor_time <- dropout_times[i]
+    } else {
+      times <- full_time_points
+      censor_time <- max_follow_up
+    }
+    
+    follow_up_years[i] <- max(times)
+    
+    decay_out <- generate_decay_rate()
+    decay_rate <- decay_out[1]
+    a <- decay_out[2]
+    b <- decay_out[3]
+    decay_params[i, ] <- c(a, b)
+    
+    if (has_failed) {
+      fail_idx <- which(times >= fail_time)
+      treatment_failure_vector[i] <- TRUE
+      rebound_rate <- runif(1, min = 0.01, max = 0.05)
+      rebound_rate_vector[i] <- rebound_rate
+      
+      pre_fail_times <- times[1:(fail_idx[1] - 1)]
+      expected_odn <- exp_decay(pre_fail_times, baseline, decay_rate)
+      
+      rebound_t <- times[fail_idx[1]:(fail_idx[1])]
+      odn_start <- tail(expected_odn, 1)
+      rebound_odn <- exp_rebound(odn_start, rebound_t, rebound_rate)
+      
+      combined_odn <- c(expected_odn, rebound_odn)
+    } else {
+      combined_odn <- exp_decay(times, baseline, decay_rate)
+    }
+    
+    noise_sd <- if (noise_model == 1) compute_noise_sd1(combined_odn) else compute_noise_sd2(combined_odn)
+    noisy_odn <- pmax(rnorm(length(times), mean = combined_odn, sd = noise_sd), 0.001)
+    
+    decay_data_list[[i]] <- data.frame(
+      individual = i,
+      time = times,
+      value = noisy_odn
+    )
+    
+    censor_time_vec[i] <- censor_time
+  }
+  
+  decay_data <- do.call(rbind, decay_data_list)
+  
+  model_parameters <- data.frame(
+    id = 1:n_individuals,
+    baseline = baselines,
+    a = decay_params[, 1],
+    b = decay_params[, 2],
+    follow_up_years = follow_up_years,
+    dropout_time = dropout_times,
+    dropped_out = dropout_flags,
+    treatment_failure = treatment_failure_vector,
+    failure_time = fail_times,
+    rebound_rate = rebound_rate_vector,
+    censor_time = censor_time_vec
+  )
+  
+  return(list(
+    decay_data = decay_data,
+    model_parameters = model_parameters
+  ))
+}
+
+
+result <- simulate_ODn_decay(
+  coef_estimates = coef_estimates,
+  coef_se = coef_se,
+  n_individuals = 10000,
+  baseline_mean = 3.47,
+  baseline_sd = 1.55,
+  sigma_0 = -0.01469,
+  slope_sigma = 0.14513,
+  baseline_noise = 0.1,
+  fraction = 0.15,
+  noise_model = 2  # 1 = heteroskedastic, 2 = realistic noise
+)
+
+decay_data <- result$decay_data
+model_parameters <- result$model_parameters
+
+
+x <- full_dataset %>%
+  group_by(subject_label_blinded) %>%
+  arrange(subject_label_blinded, years_since_tx_start) %>%
+  mutate(visits = 1:length(subject_label_blinded),
+         max_visits = max(visits)) %>%
+  filter(Group == 'early suppressions') %>%
+  distinct(subject_label_blinded, .keep_all = T)
+x2 = cephia_samples %>%
+  distinct(subject_label_blinded, .keep_all = T)
+
+dataset_ggplot <- decay_data %>%
+  filter(individual %in% sample(length(unique(decay_data$individual)), 100, replace = F)) 
+set.seed(11)
+ggplot_plots <- ggpubr::ggarrange( 
+  ggplot(full_dataset %>%
+           filter(Group == 'early suppressions'), 
+         aes(x = years_since_tx_start, y = sedia_ODn, group = subject_label_blinded, color = subject_label_blinded)) +
+    geom_line(size = 1.5) +
+    # geom_line(alpha = 0.5) +
+    labs(#title = "Exponential Decay Curves for Individuals",
+      x = "Time since ART start (years)",
+      y = "ODn Value") +
+    # theme_classic() +
+    theme(
+      text = element_text(size = 20),
+      plot.title = element_text(hjust = 0.5),
+      axis.line = element_line(colour = "black"),
+      axis.text = element_text(size = 18),
+      axis.title = element_text(size = 18),
+      panel.background = element_blank(),
+      panel.border = element_blank(),
+      plot.margin = unit(c(0, 0, 0, 0), "null"),
+      legend.position = "none"
+    ),
+  
+  
+  ggplot(decay_data %>%
+           mutate(flag = as.logical(ifelse(individual %in% sample(n_individuals, 50, replace = F), 1, 0))), 
+         aes(x = time, y = value, group = individual, color = flag)) +
+    geom_line(alpha = 0.5, linewidth = 1.5) +
+    gghighlight(flag, use_direct_label = FALSE, unhighlighted_colour = "grey70") +
+    scale_color_manual(values = c("FALSE" = "grey70", "TRUE" = "black")) +
+    labs(#title = "Exponential Decay Curves for Individuals",
+      x = "Time since ART start (years)",
+      y = "Estimated ODn Value")  +
+    scale_y_continuous(limits = c(0, max(dataset_ggplot$value))) +
+    scale_x_continuous(limits = c(0, max(dataset_ggplot$time))) +
+    # theme_classic() +
+    theme(
+      text = element_text(size = 20),
+      plot.title = element_text(hjust = 0.5),
+      axis.line = element_line(colour = "black"),
+      axis.text = element_text(size = 18),
+      axis.title = element_text(size = 18),
+      panel.background = element_blank(),
+      panel.border = element_blank(),
+      plot.margin = unit(c(0, 0, 0, 0), "null"),
+      legend.position = "none"
+    ),
+  labels = c("A", "B"),
+  ncol = 1, nrow = 2
+)
+
+saveRDS(model_parameters, 'data/Exponential.rds')
+jpeg('other_figures/simulated_plot - exponential_new.jpeg', units = "in", width = 9, height = 9, res = 300)
+ggplot_plots
+dev.off()
+
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# --- Simulate Data ---
+set.seed(2025)
+
+sim <- simulate_ODn_decay(
+  coef_estimates = c(0.5, 0.1),   # example values
+  coef_se = c(0.05, 0.02),
+  n_individuals = 100,
+  baseline_mean = 3,
+  baseline_sd = 1,
+  sigma_0 = 0.2,
+  slope_sigma = 0.1,
+  baseline_noise = 0.2,
+  fraction = 0.1,
+  max_follow_up = 10,
+  time_interval = 0.5,
+  noise_model = 1,
+  failure_prob = 0.2,
+  dropout_prob = 0.1
+)
+
+decay_data <- sim$decay_data
+model_parameters <- sim$model_parameters
+
+# --- Plot 1: All Individual Trajectories ---
+ggplot(decay_data, aes(x = time, y = value, group = individual)) +
+  geom_line(alpha = 0.3) +
+  labs(
+    title = "ODn Trajectories Over Time",
+    subtitle = "All individuals (n = 100)",
+    x = "Time since ART start (years)",
+    y = "ODn Value"
+  ) +
+  theme_minimal()
+
+# --- Plot 2: Highlight Failures vs. Non-failures ---
+decay_data <- decay_data %>%
+  left_join(model_parameters %>% select(id, treatment_failure), by = c("individual" = "id"))
+
+ggplot(decay_data, aes(x = time, y = value, group = individual, color = treatment_failure)) +
+  geom_line(alpha = 0.6) +
+  scale_color_manual(values = c("gray40", "red")) +
+  labs(
+    title = "ODn Trajectories with Treatment Failures Highlighted",
+    x = "Time since ART start (years)",
+    y = "ODn Value",
+    color = "Treatment Failure"
+  ) +
+  theme_minimal()
+
+# --- Plot 3: Smoothed Trend ---
+ggplot(decay_data, aes(x = time, y = value)) +
+  geom_smooth(method = "loess", span = 0.3, se = FALSE, color = "blue") +
+  labs(
+    title = "Smoothed Average ODn Decay Over Time",
+    x = "Time since ART start (years)",
+    y = "Mean ODn Value"
+  ) +
+  theme_minimal()
+
+# --- Plot 4: Histogram of Follow-up Duration ---
+ggplot(model_parameters, aes(x = follow_up_years)) +
+  geom_histogram(binwidth = 0.5, fill = "steelblue", color = "white") +
+  labs(
+    title = "Distribution of Follow-up Duration",
+    x = "Follow-up Time (years)",
+    y = "Number of Individuals"
+  ) +
+  theme_minimal()
+
+simulate_ODn_decay_LMM <- function(n_individuals,
+                                   baseline_mean, baseline_sd,
+                                   slope_mean, slope_sd,
+                                   sigma_0 = 0.1, slope_sigma = 0.05,
+                                   baseline_noise = 0.05, fraction = 0.1,
+                                   max_follow_up = 10,
+                                   time_interval = 0.5,
+                                   noise_model = 1,
+                                   failure_prob = 0.2,
+                                   dropout_prob = 0.1) {
+  library(truncnorm)
+  library(dplyr)
+  set.seed(11)
+  full_time_points <- seq(0, max_follow_up, by = time_interval)
+  
+  # Baseline ODn values (truncated normal to avoid negative values)
+  baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.1, b = 7.4)
+  
+  # Random individual slopes (may be positive or negative)
+  slopes <- rnorm(n_individuals, mean = slope_mean, sd = slope_sd)
+  
+  # Treatment failure and dropout flags
+  fail_flags <- runif(n_individuals) < failure_prob
+  fail_times <- ifelse(fail_flags, runif(n_individuals, min = 1, max = max_follow_up), NA)
+  
+  dropout_flags <- ifelse(!fail_flags, runif(n_individuals) < dropout_prob, FALSE)
+  dropout_times <- ifelse(dropout_flags, runif(n_individuals, min = 1, max = max_follow_up), NA)
+  
+  compute_noise_sd1 <- function(odn) pmax(sigma_0 + slope_sigma * odn, 0.01)
+  compute_noise_sd2 <- function(odn) pmax(baseline_noise + fraction * odn, 0.01)
+  
+  decay_data_list <- vector("list", n_individuals)
+  rebound_rate_vector <- rep(NA, n_individuals)
+  follow_up_years <- rep(NA, n_individuals)
+  censor_time_vec <- rep(NA, n_individuals)
+  
+  for (i in 1:n_individuals) {
+    baseline <- baselines[i]
+    slope <- slopes[i]
+    
+    if (fail_flags[i]) {
+      times <- seq(0, fail_times[i] + time_interval, by = time_interval)
+      censor_time <- max(times)
+    } else if (dropout_flags[i]) {
+      times <- seq(0, dropout_times[i], by = time_interval)
+      censor_time <- dropout_times[i]
+    } else {
+      times <- full_time_points
+      censor_time <- max_follow_up
+    }
+    
+    follow_up_years[i] <- max(times)
+    
+    if (fail_flags[i]) {
+      fail_idx <- which(times >= fail_times[i])
+      rebound_rate <- runif(1, min = 0.01, max = 0.05)
+      rebound_rate_vector[i] <- rebound_rate
+      
+      pre_fail_times <- times[1:(fail_idx[1] - 1)]
+      post_fail_times <- times[fail_idx[1]:length(times)]
+      
+      expected_pre_fail <- baseline + slope * pre_fail_times
+      start_value <- tail(expected_pre_fail, 1)
+      expected_post_fail <- start_value * exp(rebound_rate * (post_fail_times - post_fail_times[1]))
+      
+      combined_odn <- c(expected_pre_fail, expected_post_fail)
+    } else {
+      combined_odn <- baseline + slope * times
+    }
+    
+    combined_odn <- pmax(combined_odn, 0.001)
+    
+    noise_sd <- if (noise_model == 1) compute_noise_sd1(combined_odn) else compute_noise_sd2(combined_odn)
+    noisy_odn <- pmax(rnorm(length(times), mean = combined_odn, sd = noise_sd), 0.001)
+    
+    decay_data_list[[i]] <- data.frame(
+      individual = i,
+      time = times,
+      value = noisy_odn
+    )
+    
+    censor_time_vec[i] <- censor_time
+  }
+  
+  decay_data <- do.call(rbind, decay_data_list)
+  
+  model_parameters <- data.frame(
+    id = 1:n_individuals,
+    baseline = baselines,
+    slope = slopes,
+    follow_up_years = follow_up_years,
+    dropout_time = dropout_times,
+    dropped_out = dropout_flags,
+    treatment_failure = fail_flags,
+    failure_time = fail_times,
+    rebound_rate = rebound_rate_vector,
+    censor_time = censor_time_vec
+  )
+  
+  return(list(
+    decay_data = decay_data,
+    model_parameters = model_parameters
+  ))
+}
+
+sim_results <- simulate_ODn_decay_LMM(
+  n_individuals = 500,
+  baseline_mean = 3.0,
+  baseline_sd = 0.8,
+  slope_mean = -0.25,
+  slope_sd = 0.1,
+  sigma_noise = 0.3,        # fixed Gaussian noise SD
+  failure_prob = 0.2,
+  dropout_prob = 0.1
+)
+
+decay_data <-sim_results$decay_data
+model_parameters <- sim_results$model_parameters
