@@ -417,20 +417,20 @@ test_data <- bind_rows(
 #                                              param_sim_data = model_parameters)
 #   results <- rbind(results, best_model_parameters)
 # }
-best_model_choice <- function(test_data, param_sim_data, baselines) {
+best_model_choice <- function(test_data, param_sim_data) {
   time_vec <- test_data[, 2]
   ODn_vec <- test_data[, 3]
   
   dt <- param_sim_data
   a <- dt$a
   b <- dt$b
-  c <- dt$c
-  
+  baseline <- dt$baseline
+  # browser()
   # Loop over each timepoint
   for (i in 1:nrow(test_data)) {
     t <- time_vec[[i, 1]]
     y <- ODn_vec[[i, 1]]
-    pred <- pmax(baselines * exp(-(a * t^2 + b * t + c) * t), 0.001)
+    pred <- pmax(baseline * exp(-(a + b * t ) * t), 0.001)
     dt[[paste0("squared_error", i)]] <- (y - pred)^2
     dt[[paste0("abs_error", i)]] <- abs(y - pred)
   }
@@ -444,7 +444,7 @@ best_model_choice <- function(test_data, param_sim_data, baselines) {
     mutate(
       rmse = sqrt(mean(c_across(starts_with("squared_error")))),
       mae = mean(c_across(starts_with("abs_error"))),
-      complexity = abs(a) + abs(b) + abs(c)
+      complexity = abs(a) + abs(b) #+ abs(c)
     ) %>%
     ungroup()
   
@@ -471,7 +471,7 @@ best_model_choice <- function(test_data, param_sim_data, baselines) {
   }
   
   # Final selection
-  return(dt_min_rmse %>% dplyr::select(id, baselines, a, b, c, rmse, mae))
+  return(dt_min_rmse %>% dplyr::select(id, baseline, a, b, rmse, mae))
 }
 
 
@@ -485,8 +485,8 @@ for (i in seq_along(ids)) {
   
   best_model_parameters <- best_model_choice(
     test_data = individual_data,
-    param_sim_data = model_parameters,
-    baselines = model_parameters$baselines
+    param_sim_data = model_parameters#,
+    # baselines = model_parameters$baselines
   )
   
   results[[i]] <- best_model_parameters
@@ -536,20 +536,40 @@ noise <- summary(glm(sd_Sedia_ODn ~ mean_Sedia_ODn, data = sedia_distribution_bl
 ######################################################################
 #How about a new time point?
 ######################################################################
+
 compare_value_with_others <- function(data_set, t, y_ODn, sigma_ODn, sigma_y_ODn, id) {
-  # browser()
-  t <- t #/ 365.25
+  t <- t
   y <- y_ODn
-  y_hat <- (data_set %>%
-              mutate(y_hat = pmax(baselines * exp(-(a * t^2 + b * t + c) * t), .001)))$y_hat
-  sigma_pooled <- (sigma_y_ODn^2 + sigma_ODn^2)^.5
-  z_test <- (y - y_hat) / sigma_pooled
-  set.seed(11)
-  Z <- Normal(0, 1) # make a standard normal r.v.
-  p_value <- 1 - pnorm(z_test) #2 * (1 - cdf(Z, abs(z_test)))
-  results <- cbind(id = data_set$id, value = y, z_stat = z_test, p_value = p_value, record_id = id) # value = y,
+  
+  # Compute predicted ODn value
+  y_hat <- with(data_set, pmax(baseline * exp(-(a + b * t) * t), .001))
+  
+  # Compute pooled standard deviation
+  sigma_pooled <- sqrt(sigma_y_ODn^2 + sigma_ODn^2)
+  
+  # Compute z-statistic
+  z_stat <- (y - y_hat) / sigma_pooled
+  
+  # One-sided p-value for H1: y > y_hat
+  p_value <- 1 - pnorm(z_stat)
+  
+  # Flag values where y > y_hat is statistically significant at alpha = 0.05
+  flagged <- p_value < 0.05
+  
+  # Return a data frame with full diagnostics
+  results <- data.frame(
+    id = data_set$id,
+    value = y,
+    predicted = y_hat,
+    z_stat = z_stat,
+    p_value = p_value,
+    flagged = flagged,
+    record_id = id
+  )
+  
   return(results)
 }
+
 test_data_last_visit <- test_data %>%
   filter(!is.na(peak_visit))
 results1 <- c()
