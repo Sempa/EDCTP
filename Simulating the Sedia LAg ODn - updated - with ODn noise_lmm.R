@@ -440,6 +440,138 @@ result <- simulate_ODn_decay2(
 decay_data <- result$decay_data
 model_parameters <- result$model_parameters
 
+best_model_choice2 <- function(test_data, param_sim_data) {
+  library(dplyr)
+  
+  # Filter out individuals who had treatment failure (i.e., viral rebound)
+  param_sim_data <- param_sim_data %>% filter(!treatment_failure)
+  
+  if (nrow(param_sim_data) == 0) {
+    stop("No eligible models available: all individuals had viral rebound.")
+  }
+  
+  # Extract time and ODn values from test data
+  time_vec <- test_data[[2]]
+  ODn_vec <- test_data[[3]]
+  n_timepoints <- length(time_vec)
+  n_models <- nrow(param_sim_data)
+  
+  # Create prediction matrix using log-linear model
+  time_matrix <- matrix(rep(time_vec, each = n_models), nrow = n_models)
+  a_matrix <- matrix(param_sim_data$a, nrow = n_models, ncol = n_timepoints)
+  b_matrix <- matrix(param_sim_data$b, nrow = n_models, ncol = n_timepoints)
+  
+  pred_matrix <- exp(a_matrix + b_matrix * time_matrix)
+  pred_matrix <- pmax(pred_matrix, 0.001)
+  
+  # Actual observed ODn values replicated
+  obs_matrix <- matrix(rep(ODn_vec, each = n_models), nrow = n_models)
+  
+  # Error matrices
+  sq_error_matrix <- (obs_matrix - pred_matrix)^2
+  abs_error_matrix <- abs(obs_matrix - pred_matrix)
+  
+  # Filter out rows with infinite errors
+  finite_rows <- is.finite(rowSums(sq_error_matrix))
+  param_sim_data <- param_sim_data[finite_rows, , drop = FALSE]
+  sq_error_matrix <- sq_error_matrix[finite_rows, , drop = FALSE]
+  abs_error_matrix <- abs_error_matrix[finite_rows, , drop = FALSE]
+  
+  if (nrow(param_sim_data) == 0) {
+    stop("All filtered models resulted in invalid predictions.")
+  }
+  
+  # Performance metrics
+  param_sim_data$rmse <- sqrt(rowMeans(sq_error_matrix))
+  param_sim_data$mae <- rowMeans(abs_error_matrix)
+  param_sim_data$complexity <- abs(param_sim_data$a) + abs(param_sim_data$b)
+  
+  # Select best model
+  dt_min <- param_sim_data %>% filter(rmse == min(rmse))
+  if (nrow(dt_min) > 1) {
+    dt_min <- dt_min %>% filter(mae == min(mae))
+  }
+  if (nrow(dt_min) > 1) {
+    dt_min <- dt_min %>% filter(complexity == min(complexity))
+  }
+  if (nrow(dt_min) > 1) {
+    set.seed(11)
+    dt_min <- dt_min[sample(1:nrow(dt_min), 1), ]
+  }
+  
+  return(dt_min %>% dplyr::select(id, baseline, a, b, rmse, mae))
+}
+
+# library(dplyr)
+library(purrr)
+
+# Filter once outside the loop
+test_data_filtered <- test_data %>% 
+  filter(is.na(peak_visit)) %>% 
+  group_split(record_id)
+
+# Apply best_model_choice efficiently using map
+results_list <- map(test_data_filtered, function(individual_data) {
+  best_model_choice2(
+    test_data = individual_data,
+    param_sim_data = model_parameters
+  )
+})
+
+# Combine all individual results into a single dataframe
+results <- results_df <- bind_rows(results_list)
+
+compare_value_with_others2 <- function(a, b, baseline, t, y_ODn, sigma_ODn, sigma_y_ODn, id) {
+  # Compute predicted ODn value from log-linear model
+  y_hat <- pmax(baseline * exp(-(a + b * t) * t), 0.001)
+  
+  # Compute pooled standard deviation
+  sigma_pooled <- sqrt(sigma_ODn^2 + sigma_y_ODn^2)
+  
+  # Compute z-statistic
+  z_stat <- (y_ODn - y_hat) / sigma_pooled
+  
+  # One-sided p-value for H1: y_ODn > y_hat
+  p_value <- 1 - pnorm(z_stat)
+  
+  # Significance flag
+  flagged <- p_value < 0.05
+  
+  # Return results as a tibble
+  tibble::tibble(
+    id = id,
+    value = y_ODn,
+    predicted = y_hat,
+    z_stat = z_stat,
+    p_value = p_value,
+    flagged = flagged
+  )
+}
+
+# Step 1: Filter last visits (post-rebound)
+test_data_last_visit <- test_data %>% 
+  filter(!is.na(peak_visit)) %>% 
+  group_by(record_id) %>% 
+  slice_tail(n = 1) %>% 
+  ungroup()
+
+# Step 2: Join with model parameters
+data_combined <- test_data_last_visit %>% 
+  left_join(results, by = c("record_id"))
+
+# Step 3: Efficiently compute pooled SDs and p-values
+results_final <- pmap_dfr(
+  list(
+    split(data_combined, seq_len(nrow(data_combined))),
+    data_combined$time_vec,
+    data_combined$ODn_vec,
+    map_dbl(data_combined$record_id, ~ sd(test_data$ODn_vec[test_data$record_id == .x & is.na(test_data$peak_visit)])),
+    noise$coefficients[1, 1] + noise$coefficients[2, 1] * data_combined$time_vec,
+    data_combined$record_id
+  ),
+  ~ compare_value_with_others(..1, ..2, ..3, ..4, ..5, ..6)
+)
+
 
 x <- full_dataset %>%
   group_by(subject_label_blinded) %>%

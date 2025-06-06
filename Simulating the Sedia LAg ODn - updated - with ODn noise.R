@@ -11,6 +11,7 @@ library(distributions3)
 library("gghighlight")
 library(brolgar)
 library(glmmTMB)
+library(purrr)
 
 sediaData_full <- read_csv("data/JHU/CEPHIA - JHU LAg-Avidity Data.csv")
 
