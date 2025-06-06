@@ -31,7 +31,7 @@ simulate_ODn_decay <- function(coef_estimates, coef_se,
   
   # Nonlinear decay function
   exp_decay <- function(t, baseline, decay_rate) {
-    pmax(exp(intercept + slope * t), 0.001)#pmax(baseline / (1 + decay_rate * t), 0.001)
+    pmax(baseline / (1 + decay_rate * t), 0.001)
   }
   
   exp_rebound <- function(start_value, t, rebound_rate) {
@@ -125,46 +125,74 @@ simulate_ODn_decay <- function(coef_estimates, coef_se,
   ))
 }
 
+
+result <- simulate_ODn_decay1(
+  coef_estimates = coef_estimates,
+  coef_se = coef_se,
+  n_individuals = 10000,
+  baseline_mean = 3.47,
+  baseline_sd = 1.55,
+  sigma_0 = -0.01469,
+  slope_sigma = 0.14513,
+  baseline_noise = 0.1,
+  fraction = 0.15,
+  noise_model = 1  # 1 = heteroskedastic, 2 = realistic noise
+)
+
+decay_data <- result$decay_data
+model_parameters <- result$model_parameters
+
 # using actual model formulation
-simulate_ODn_decay <- function(coef_estimates, coef_se,
-                               n_individuals,
-                               baseline_mean, baseline_sd,
-                               sigma_0, slope_sigma,
-                               baseline_noise, fraction,
-                               max_follow_up = 10,
-                               time_interval = 0.5,
-                               noise_model = 1,
-                               failure_prob = 0.2,
-                               dropout_prob = 0.1) {
+simulate_ODn_decay1 <- function(coef_estimates, coef_se,
+                                n_individuals,
+                                baseline_mean, baseline_sd,
+                                sigma_0, slope_sigma,
+                                baseline_noise, fraction,
+                                max_follow_up = 10,
+                                time_interval = 0.5,
+                                noise_model = 1,
+                                failure_prob = 0.2,
+                                dropout_prob = 0.1) {
   library(truncnorm)
   library(dplyr)
   
   full_time_points <- seq(0, max_follow_up, by = time_interval)
   
-  # Truncated normal baseline ODn values
   baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.03, b = 7.4)
   
-  # Treatment failure and dropout indicators
   fail_flags <- runif(n_individuals) < failure_prob
   fail_times <- ifelse(fail_flags, runif(n_individuals, min = 1, max = max_follow_up), NA)
+  
   dropout_flags <- ifelse(!fail_flags, runif(n_individuals) < dropout_prob, FALSE)
   dropout_times <- ifelse(dropout_flags, runif(n_individuals, min = 1, max = max_follow_up), NA)
   
-  # Decay function (exponential decay)
-  exp_decay <- function(t, baseline, decay_rate) {
-    pmax(baseline * exp(-decay_rate * t), 0.001)
+  # Simulate log-linear coefficients
+  generate_log_decay_coefs <- function() {
+    a <- rnorm(1, mean = coef_estimates[[1]], sd = coef_se[[1]])
+    b <- rnorm(1, mean = coef_estimates[[2]], sd = coef_se[[2]])
+    return(c(a, b))  # log(ODn) = a + b*t
   }
   
-  # Noise models
+  # Simulate ODn from log-linear model
+  log_linear_decay <- function(t, a, b) {
+    log_odn <- a + b * t
+    pmax(exp(log_odn), 0.001)
+  }
+  
+  # Rebound function in ODn space
+  exp_rebound <- function(start_value, t, rebound_rate) {
+    rebound <- start_value * exp(rebound_rate * (t - t[1]))
+    pmax(rebound, 0.001)
+  }
+  
   compute_noise_sd1 <- function(odn) pmax(sigma_0 + slope_sigma * odn, 0.01)
   compute_noise_sd2 <- function(odn) pmax(baseline_noise + fraction * odn, 0.01)
   
-  # Output containers
   decay_data_list <- vector("list", n_individuals)
   decay_params <- matrix(NA, n_individuals, 2)
+  rebound_rate_vector <- rep(NA, n_individuals)
   censor_time_vec <- rep(NA, n_individuals)
   treatment_failure_vector <- rep(FALSE, n_individuals)
-  rebound_rate_vector <- rep(NA, n_individuals)
   follow_up_years <- rep(NA, n_individuals)
   
   for (i in 1:n_individuals) {
@@ -172,7 +200,6 @@ simulate_ODn_decay <- function(coef_estimates, coef_se,
     has_failed <- fail_flags[i]
     fail_time <- fail_times[i]
     
-    # Determine time points
     if (has_failed) {
       times <- seq(0, fail_time + time_interval, by = time_interval)
       censor_time <- max(times)
@@ -186,28 +213,38 @@ simulate_ODn_decay <- function(coef_estimates, coef_se,
     
     follow_up_years[i] <- max(times)
     
-    # Draw log-linear decay parameters and exponentiate for exponential model
-    a_log <- rnorm(1, mean = coef_estimates[[1]], sd = coef_se[[1]])
-    b_log <- rnorm(1, mean = coef_estimates[[2]], sd = coef_se[[2]])
-    decay_rate <- exp(a_log + b_log * 0)  # At baseline
+    coefs <- generate_log_decay_coefs()
+    a <- coefs[1]
+    b <- coefs[2]
+    decay_params[i, ] <- coefs
     
-    decay_params[i, ] <- c(a_log, b_log)
+    if (has_failed) {
+      fail_idx <- which(times >= fail_time)
+      treatment_failure_vector[i] <- TRUE
+      rebound_rate <- runif(1, min = 0.01, max = 0.05)
+      rebound_rate_vector[i] <- rebound_rate
+      
+      pre_fail_times <- times[1:(fail_idx[1] - 1)]
+      expected_odn <- log_linear_decay(pre_fail_times, a, b)
+      
+      rebound_t <- times[fail_idx[1]:(fail_idx[1])]
+      odn_start <- tail(expected_odn, 1)
+      rebound_odn <- exp_rebound(odn_start, rebound_t, rebound_rate)
+      
+      combined_odn <- c(expected_odn, rebound_odn)
+    } else {
+      combined_odn <- log_linear_decay(times, a, b)
+    }
     
-    # Simulate ODn values
-    expected_odn <- exp_decay(times, baseline, decay_rate)
+    noise_sd <- if (noise_model == 1) compute_noise_sd1(combined_odn) else compute_noise_sd2(combined_odn)
+    noisy_odn <- pmax(rnorm(length(times), mean = combined_odn, sd = noise_sd), 0.001)
     
-    # Add noise
-    noise_sd <- if (noise_model == 1) compute_noise_sd1(expected_odn) else compute_noise_sd2(expected_odn)
-    noisy_odn <- pmax(rnorm(length(times), mean = expected_odn, sd = noise_sd), 0.001)
-    
-    # Save data
     decay_data_list[[i]] <- data.frame(
       individual = i,
       time = times,
       value = noisy_odn
     )
     
-    treatment_failure_vector[i] <- has_failed
     censor_time_vec[i] <- censor_time
   }
   
@@ -233,8 +270,7 @@ simulate_ODn_decay <- function(coef_estimates, coef_se,
   ))
 }
 
-
-result <- simulate_ODn_decay(
+result <- simulate_ODn_decay1(
   coef_estimates = coef_estimates,
   coef_se = coef_se,
   n_individuals = 10000,
@@ -244,9 +280,163 @@ result <- simulate_ODn_decay(
   slope_sigma = 0.14513,
   baseline_noise = 0.1,
   fraction = 0.15,
-  noise_model = 2  # 1 = heteroskedastic, 2 = realistic noise
+  noise_model = 1  # 1 = heteroskedastic, 2 = realistic noise
 )
 
+decay_data <- result$decay_data
+model_parameters <- result$model_parameters
+
+# adding a sigmoid or logistic rebound
+simulate_ODn_decay2 <- function(coef_estimates, coef_se,
+                                n_individuals,
+                                baseline_mean, baseline_sd,
+                                sigma_0, slope_sigma,
+                                baseline_noise, fraction,
+                                max_follow_up = 10,
+                                time_interval = 0.5,
+                                noise_model = 1,
+                                failure_prob = 0.2,
+                                dropout_prob = 0.1,
+                                rebound_model = c("sigmoid", "logistic")) {
+  library(truncnorm)
+  library(dplyr)
+  
+  rebound_model <- match.arg(rebound_model)
+  full_time_points <- seq(0, max_follow_up, by = time_interval)
+  
+  baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.03, b = 7.4)
+  fail_flags <- runif(n_individuals) < failure_prob
+  fail_times <- ifelse(fail_flags, runif(n_individuals, min = 1, max = max_follow_up - 3 * time_interval), NA)
+  dropout_flags <- ifelse(!fail_flags, runif(n_individuals) < dropout_prob, FALSE)
+  dropout_times <- ifelse(dropout_flags, runif(n_individuals, min = 1, max = max_follow_up), NA)
+  
+  generate_log_decay_coefs <- function() {
+    a <- rnorm(1, mean = coef_estimates[[1]], sd = coef_se[[1]])
+    b <- rnorm(1, mean = coef_estimates[[2]], sd = coef_se[[2]])
+    return(c(a, b))
+  }
+  
+  log_linear_decay <- function(t, a, b) {
+    log_odn <- a + b * t
+    pmax(exp(log_odn), 0.001)
+  }
+  
+  sigmoid <- function(t, midpoint, slope = 2) {
+    1 / (1 + exp(-slope * (t - midpoint)))
+  }
+  
+  logistic <- function(t, midpoint, slope = 6) {
+    1 / (1 + exp(-slope * (t - midpoint)))
+  }
+  
+  exp_rebound <- function(start_value, t, rebound_rate, fail_time) {
+    rebound <- start_value * exp(rebound_rate * (t - fail_time))
+    pmax(rebound, 0.001)
+  }
+  
+  compute_noise_sd1 <- function(odn) pmax(sigma_0 + slope_sigma * odn, 0.01)
+  compute_noise_sd2 <- function(odn) pmax(baseline_noise + fraction * odn, 0.01)
+  
+  decay_data_list <- vector("list", n_individuals)
+  decay_params <- matrix(NA, n_individuals, 2)
+  rebound_rate_vector <- rep(NA, n_individuals)
+  censor_time_vec <- rep(NA, n_individuals)
+  treatment_failure_vector <- rep(FALSE, n_individuals)
+  follow_up_years <- rep(NA, n_individuals)
+  
+  for (i in 1:n_individuals) {
+    baseline <- baselines[i]
+    has_failed <- fail_flags[i]
+    fail_time <- fail_times[i]
+    
+    if (has_failed) {
+      times <- seq(0, fail_time + 3 * time_interval, by = time_interval)
+      censor_time <- max(times)
+    } else if (dropout_flags[i]) {
+      times <- seq(0, dropout_times[i], by = time_interval)
+      censor_time <- dropout_times[i]
+    } else {
+      times <- full_time_points
+      censor_time <- max_follow_up
+    }
+    
+    follow_up_years[i] <- max(times)
+    coefs <- generate_log_decay_coefs()
+    a <- coefs[1]
+    b <- coefs[2]
+    decay_params[i, ] <- coefs
+    
+    if (has_failed) {
+      fail_idx <- which(times >= fail_time)[1]
+      treatment_failure_vector[i] <- TRUE
+      rebound_rate <- runif(1, min = 0.01, max = 0.05)
+      rebound_rate_vector[i] <- rebound_rate
+      
+      decay_vals <- log_linear_decay(times, a, b)
+      rebound_start <- decay_vals[fail_idx]
+      rebound_vals <- exp_rebound(rebound_start, times, rebound_rate, fail_time)
+      
+      transition_weights <- if (rebound_model == "sigmoid") {
+        sigmoid(times, fail_time)
+      } else {
+        logistic(times, fail_time)
+      }
+      
+      combined_odn <- (1 - transition_weights) * decay_vals + transition_weights * rebound_vals
+    } else {
+      combined_odn <- log_linear_decay(times, a, b)
+    }
+    
+    noise_sd <- if (noise_model == 1) compute_noise_sd1(combined_odn) else compute_noise_sd2(combined_odn)
+    noisy_odn <- pmax(rnorm(length(times), mean = combined_odn, sd = noise_sd), 0.001)
+    
+    decay_data_list[[i]] <- data.frame(
+      individual = i,
+      time = times,
+      value = noisy_odn
+    )
+    
+    censor_time_vec[i] <- censor_time
+  }
+  
+  decay_data <- do.call(rbind, decay_data_list)
+  model_parameters <- data.frame(
+    id = 1:n_individuals,
+    baseline = baselines,
+    a = decay_params[, 1],
+    b = decay_params[, 2],
+    follow_up_years = follow_up_years,
+    dropout_time = dropout_times,
+    dropped_out = dropout_flags,
+    treatment_failure = treatment_failure_vector,
+    failure_time = fail_times,
+    rebound_rate = rebound_rate_vector,
+    censor_time = censor_time_vec
+  )
+  
+  return(list(
+    decay_data = decay_data,
+    model_parameters = model_parameters
+  ))
+}
+
+result <- simulate_ODn_decay2(
+  coef_estimates = coef_estimates,
+  coef_se = coef_se,
+  n_individuals = 10000,
+  baseline_mean = 3.47,
+  baseline_sd = 1.55,
+  sigma_0 = -0.01469,
+  slope_sigma = 0.14513,
+  baseline_noise = 0.1,
+  fraction = 0.15,
+  max_follow_up = 10,
+  time_interval = 0.5,
+  noise_model = 1, # 1 = heteroskedastic, 2 = realistic noise
+  failure_prob = 0.25,
+  dropout_prob = 0.1,
+  rebound_model = "sigmoid"  # or "logistic"
+)
 decay_data <- result$decay_data
 model_parameters <- result$model_parameters
 
