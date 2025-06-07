@@ -304,7 +304,8 @@ simulate_ODn_decay2 <- function(coef_estimates, coef_se,
   rebound_model <- match.arg(rebound_model)
   full_time_points <- seq(0, max_follow_up, by = time_interval)
   
-  baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.03, b = 7.4)
+  # baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.03, b = 7.4)
+  baselines <- runif(n_individuals, min = 0.03, max = 7.4)
   fail_flags <- runif(n_individuals) < failure_prob
   fail_times <- ifelse(fail_flags, runif(n_individuals, min = 1, max = max_follow_up - 3 * time_interval), NA)
   dropout_flags <- ifelse(!fail_flags, runif(n_individuals) < dropout_prob, FALSE)
@@ -443,6 +444,9 @@ model_parameters <- result$model_parameters
 best_model_choice2 <- function(test_data, param_sim_data) {
   library(dplyr)
   
+  # Get the record_id from the first row of test_data (assumes single individual)
+  record_id <- test_data$record_id[1]
+  
   # Filter out individuals who had treatment failure (i.e., viral rebound)
   param_sim_data <- param_sim_data %>% filter(!treatment_failure)
   
@@ -499,7 +503,10 @@ best_model_choice2 <- function(test_data, param_sim_data) {
     dt_min <- dt_min[sample(1:nrow(dt_min), 1), ]
   }
   
-  return(dt_min %>% dplyr::select(id, baseline, a, b, rmse, mae))
+  # Add record_id to output
+  dt_min$record_id <- record_id
+  
+  return(dt_min %>% select(id, baseline, a, b, rmse, mae, record_id))
 }
 
 # library(dplyr)
@@ -572,6 +579,22 @@ results_final <- pmap_dfr(
   ~ compare_value_with_others(..1, ..2, ..3, ..4, ..5, ..6)
 )
 
+dt05 <- as.data.frame(results_final) %>%
+  left_join(bind_rows(
+    dt02 %>%
+      mutate(subject_label_blinded = as.character(subject_label_blinded)), dt04
+  ) %>%
+    mutate(record_id = as.numeric(as.factor(subject_label_blinded))), by = 'record_id') %>%
+  dplyr::select(names(as.data.frame(results1)), strata) %>%
+  distinct(record_id, .keep_all = T) %>%
+  mutate(y_hat_status = as.factor(ifelse(p_value < 0.05, 1, 2)),
+         y = as.factor(ifelse(strata == 'early suppressions', 1, 2)) )
+
+dt06 <- dt05 %>%
+  dplyr::select(strata, flagged) %>%
+  tbl_summary(by = strata
+  )
+dt06
 
 x <- full_dataset %>%
   group_by(subject_label_blinded) %>%
