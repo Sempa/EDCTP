@@ -286,7 +286,73 @@ result <- simulate_ODn_decay1(
 decay_data <- result$decay_data
 model_parameters <- result$model_parameters
 
-# adding a sigmoid or logistic rebound
+# Adding a sigmoid or logistic rebound
+#' Simulate ODn Decay Trajectories with Treatment Failure and Antibody Rebound
+#'
+#' Simulates individual-level longitudinal ODn decay data using an exponential decay model
+#' with optional noise, treatment failure, dropout, and post-failure antibody rebound.
+#'
+#' @param coef_estimates A numeric vector of length 2 with the mean coefficients (`a`, `b`)
+#'   for the log-linear decay model (`log(ODn) = a + b * time`).
+#' @param coef_se A numeric vector of length 2 with the standard errors for `a` and `b`.
+#' @param n_individuals Integer. Number of individuals to simulate.
+#' @param baseline_mean Mean of the baseline ODn distribution (used if truncated normal sampling is enabled).
+#' @param baseline_sd Standard deviation of the baseline ODn distribution.
+#' @param sigma_0 Intercept for heteroskedastic noise model 1.
+#' @param slope_sigma Slope for heteroskedastic noise model 1.
+#' @param baseline_noise Intercept for noise model 2.
+#' @param fraction Fraction of the current ODn value used to determine standard deviation in noise model 2.
+#' @param max_follow_up Numeric. Maximum follow-up duration in years (default is 10).
+#' @param time_interval Numeric. Time interval between visits (in years; default is 0.5).
+#' @param noise_model Integer. Noise model to use: `1` = sigma depends on `ODn`, `2` = alternative model.
+#' @param failure_prob Probability that an individual will experience treatment failure.
+#' @param dropout_prob Probability that a non-failing individual will be censored due to dropout.
+#' @param rebound_model Character. Either `"sigmoid"` or `"logistic"` to control the rebound trajectory transition.
+#'
+#' @return A list with two elements:
+#' \describe{
+#'   \item{decay_data}{A data frame with columns `individual`, `time`, and `value` (simulated ODn values).}
+#'   \item{model_parameters}{A data frame with simulation parameters for each individual, including decay coefficients,
+#'   baseline ODn, failure/dropout status, censoring time, rebound rate, etc.}
+#' }
+#'
+#' @details
+#' Each individual's ODn trajectory follows a log-linear decay. Individuals may experience:
+#' \itemize{
+#'   \item Treatment failure at a random time (with probability `failure_prob`), after which their ODn rebounds.
+#'   \item Dropout (with probability `dropout_prob`) if they do not fail.
+#'   \item Rebound is modeled as an exponential increase, blended into the decay using a smooth sigmoid or logistic transition.
+#'   \item Gaussian noise is added, with a choice between two heteroskedastic noise models.
+#' }
+#'
+#' The baseline ODn is sampled from a uniform distribution between 0.03 and 7.4. The decay model parameters (`a`, `b`) are sampled per individual.
+#'
+#' @importFrom truncnorm rtruncnorm
+#' @importFrom dplyr %>%
+#'
+#' @examples
+#' sim <- simulate_ODn_decay2(
+#'   coef_estimates = c(2, -0.2),
+#'   coef_se = c(0.1, 0.05),
+#'   n_individuals = 100,
+#'   baseline_mean = 2,
+#'   baseline_sd = 0.5,
+#'   sigma_0 = 0.05,
+#'   slope_sigma = 0.1,
+#'   baseline_noise = 0.05,
+#'   fraction = 0.2,
+#'   max_follow_up = 5,
+#'   time_interval = 0.5,
+#'   noise_model = 1,
+#'   failure_prob = 0.3,
+#'   dropout_prob = 0.2,
+#'   rebound_model = "sigmoid"
+#' )
+#'
+#' head(sim$decay_data)
+#' head(sim$model_parameters)
+#'
+#' @export
 simulate_ODn_decay2 <- function(coef_estimates, coef_se,
                                 n_individuals,
                                 baseline_mean, baseline_sd,
@@ -441,6 +507,50 @@ result <- simulate_ODn_decay2(
 decay_data <- result$decay_data
 model_parameters <- result$model_parameters
 
+#' Select the Best-Matching Log-Linear Decay Model for a Test Individual
+#'
+#' Given a test individual's longitudinal ODn data and a parameter set of simulated models
+#' (excluding those with treatment failure), this function finds the best-fitting decay model
+#' using root mean squared error (RMSE), mean absolute error (MAE), and a simple model complexity metric.
+#'
+#' @param test_data A data frame containing the observed data for a single individual.
+#'   It must have a column named `record_id`, followed by columns representing time and ODn values
+#'   (usually named `time` and `value` respectively).
+#' @param param_sim_data A data frame containing simulated model parameters for multiple individuals.
+#'   Must include columns: `id`, `baseline`, `a`, `b`, and `treatment_failure`.
+#'
+#' @return A data frame with the best-matching model parameters, including:
+#' \describe{
+#'   \item{id}{ID of the selected simulated individual.}
+#'   \item{baseline}{Baseline ODn value.}
+#'   \item{a, b}{Log-linear decay coefficients.}
+#'   \item{rmse}{Root mean squared error between model predictions and observed ODn.}
+#'   \item{mae}{Mean absolute error.}
+#'   \item{record_id}{ID of the test individual.}
+#' }
+#'
+#' @details
+#' The function matches the observed ODn trajectory of a test individual against a library
+#' of simulated trajectories defined by log-linear decay parameters (`a`, `b`), using the following criteria:
+#' \enumerate{
+#'   \item Lowest RMSE
+#'   \item Lowest MAE (used to break ties)
+#'   \item Lowest model complexity, defined as \code{abs(a) + abs(b)} (further tie-breaker)
+#'   \item Random choice if still tied
+#' }
+#'
+#' Simulated models with treatment failure are excluded. Infinite or NaN errors in predictions
+#' are filtered out prior to selection.
+#'
+#' @importFrom dplyr %>%, filter, select
+#'
+#' @examples
+#' # Example usage (assuming simulated parameter data and test data are available)
+#' best_model <- best_model_choice2(test_data = test_individual_df,
+#'                                  param_sim_data = simulation_df)
+#' print(best_model)
+#'
+#' @export
 best_model_choice2 <- function(test_data, param_sim_data) {
   library(dplyr)
   
@@ -527,6 +637,55 @@ results_list <- map(test_data_filtered, function(individual_data) {
 
 # Combine all individual results into a single dataframe
 results <- results_df <- bind_rows(results_list)
+
+#' Compare an Observed ODn Value to a Log-Linear Model Prediction
+#'
+#' This function compares an observed ODn value at a given time point to a model-predicted value
+#' using a log-linear decay model. It calculates the z-statistic and corresponding one-sided
+#' p-value for the hypothesis that the observed ODn is significantly greater than expected.
+#'
+#' @param a Numeric. The intercept parameter from the log-linear decay model.
+#' @param b Numeric. The slope parameter from the log-linear decay model.
+#' @param baseline Numeric. The baseline ODn value for the individual.
+#' @param t Numeric. The time point (in years) at which the observed value is compared.
+#' @param y_ODn Numeric. The observed ODn value at time `t`.
+#' @param sigma_ODn Numeric. The standard deviation of the ODn prediction at time `t`.
+#' @param sigma_y_ODn Numeric. The measurement error (standard deviation) of the observed ODn.
+#' @param id Identifier for the individual (can be numeric or character).
+#'
+#' @return A tibble with the following columns:
+#' \describe{
+#'   \item{id}{Identifier for the individual.}
+#'   \item{value}{The observed ODn value.}
+#'   \item{predicted}{The expected ODn value under the model.}
+#'   \item{z_stat}{The z-statistic comparing observed vs. predicted values.}
+#'   \item{p_value}{The one-sided p-value for \eqn{H_1: y_{ODn} > \hat{y}}.}
+#'   \item{flagged}{Logical indicator: \code{TRUE} if the result is statistically significant (p < 0.05).}
+#' }
+#'
+#' @details
+#' The predicted ODn is computed using the formula:
+#' \deqn{\hat{y} = \max(baseline \cdot \exp(-(a + b \cdot t) \cdot t), 0.001)}
+#' 
+#' The pooled standard deviation assumes independent error sources and is computed as:
+#' \deqn{\sigma_{pooled} = \sqrt{\sigma_{ODn}^2 + \sigma_{y}^2}}
+#'
+#' The z-statistic and one-sided p-value test whether the observed value is significantly
+#' greater than expected under the null model. This is useful for identifying individuals
+#' who may have ODn trajectories inconsistent with typical decay patterns.
+#'
+#' @importFrom tibble tibble
+#' @importFrom stats pnorm
+#'
+#' @examples
+#' compare_value_with_others2(
+#'   a = 0.3, b = -0.1, baseline = 2.0,
+#'   t = 2, y_ODn = 1.5,
+#'   sigma_ODn = 0.2, sigma_y_ODn = 0.15,
+#'   id = "patient_001"
+#' )
+#'
+#' @export
 
 compare_value_with_others2 <- function(a, b, baseline, t, y_ODn, sigma_ODn, sigma_y_ODn, id) {
   # Compute predicted ODn value from log-linear model
