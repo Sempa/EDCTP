@@ -154,17 +154,6 @@ baseline_ODn_table <- full_dataset %>%
 mean(c(baseline_ODn_table$sedia_ODn, baseline_ODn_data$ODn)) ## baseline mean
 sd(c(baseline_ODn_table$sedia_ODn, baseline_ODn_data$ODn))
 
-# model_eddi <- nlme::lme(sedia_ODn ~ poly(days_since_eddi, 2), 
-#                   data = sedia_eddi_data, 
-#                   random = ~ days_since_eddi|subject_label_blinded,
-#                   na.action = na.omit)
-# summary(model_eddi)
-# ploy_model <- nlme::lme(sedia_ODn ~ poly(years_since_tx_start, 2), 
-#                         data = full_dataset %>%
-#                           filter(Group == 'early suppressions'), 
-#                         random = ~years_since_tx_start|subject_label_blinded,
-#                         na.action = na.omit)
-# Use the coefficients as starting values
 poly_model <- glmmTMB(
   sedia_ODn ~ years_since_tx_start + (1 | subject_label_blinded),
   family = gaussian(link = "log"),
@@ -333,12 +322,21 @@ simulate_ODn_decay2 <- function(coef_estimates, coef_se,
       rebound_start <- decay_vals[fail_idx]
       rebound_vals <- exp_rebound(rebound_start, times, rebound_rate, fail_time)
       
+      # Get the time just before failure
+      pre_fail_idx <- max(which(times < fail_time))
+      transition_midpoint <- times[pre_fail_idx]
+      
       transition_weights <- if (rebound_model == "sigmoid") {
-        sigmoid(times, fail_time)
+        sigmoid(times, transition_midpoint)
       } else {
-        logistic(times, fail_time)
+        logistic(times, transition_midpoint)
       }
       
+      # transition_weights <- if (rebound_model == "sigmoid") {
+      #   sigmoid(times, fail_time)
+      # } else {
+      #   logistic(times, fail_time)
+      # }
       combined_odn <- (1 - transition_weights) * decay_vals + transition_weights * rebound_vals
     } else {
       combined_odn <- log_linear_decay(times, a, b)
@@ -389,7 +387,7 @@ result <- simulate_ODn_decay2(
   fraction = 0.15,
   max_follow_up = 10,
   time_interval = 0.5,
-  noise_model = 1, # 1 = heteroskedastic, 2 = realistic noise
+  noise_model = 2, # 1 = heteroskedastic, 2 = realistic noise
   failure_prob = 0.25,
   dropout_prob = 0.1,
   rebound_model = "sigmoid"  # or "logistic"
@@ -397,6 +395,7 @@ result <- simulate_ODn_decay2(
 decay_data <- result$decay_data
 model_parameters <- result$model_parameters
 
+n_individuals <- 10000
 x <- full_dataset %>%
   group_by(subject_label_blinded) %>%
   arrange(subject_label_blinded, years_since_tx_start) %>%
@@ -504,7 +503,7 @@ test_data <- bind_rows(
     mutate(subject_label_blinded = as.character(subject_label_blinded)), dt04
 ) %>%
   mutate(id = as.numeric(as.factor(subject_label_blinded))) %>%
-  dplyr::select(record_id = id, time_vec = years_since_ART_start, 
+  dplyr::select(record_id = subject_label_blinded, time_vec = years_since_ART_start, 
                 ODn_vec = sedia_ODn, peak_visit = peak)
 
 #' Select the Best-Matching Log-Linear Decay Model for a Test Individual
@@ -616,7 +615,7 @@ best_model_choice2 <- function(test_data, param_sim_data) {
   # Add record_id to output
   dt_min$record_id <- record_id
   
-  return(dt_min %>% select(id, baseline, a, b, rmse, mae, record_id))
+  return(dt_min %>% select(id, baseline, a, b, rmse, mae, treatment_failure, record_id))
 }
 
 # library(dplyr)
@@ -637,8 +636,8 @@ results_list <- map(test_data_filtered, function(individual_data) {
 
 # Combine all individual results into a single dataframe
 results <- results_df <- bind_rows(results_list)
-results <- results_df %>%
-  mutate(record_id = ids)
+# results <- results_df %>%
+#   mutate(record_id = id)
 
 ###########################################################
 ###sigma ODn
@@ -744,7 +743,7 @@ compare_value_with_others2 <- function(a, b, baseline, t, y_ODn, sigma_ODn, sigm
   
   # Return results as a tibble
   tibble::tibble(
-    id = id,
+    record_id = id,
     value = y_ODn,
     predicted = y_hat,
     z_stat = z_stat,
@@ -767,23 +766,26 @@ data_combined <- test_data_last_visit %>%
 # Step 3: Efficiently compute pooled SDs and p-values
 results_final <- pmap_dfr(
   list(
-    split(data_combined, seq_len(nrow(data_combined))),
+    data_combined$a,
+    data_combined$b,
+    data_combined$baseline,
     data_combined$time_vec,
     data_combined$ODn_vec,
     map_dbl(data_combined$record_id, ~ sd(test_data$ODn_vec[test_data$record_id == .x & is.na(test_data$peak_visit)])),
     noise$coefficients[1, 1] + noise$coefficients[2, 1] * data_combined$time_vec,
     data_combined$record_id
   ),
-  ~ compare_value_with_others(..1, ..2, ..3, ..4, ..5, ..6)
+  compare_value_with_others2
 )
 
 dt05 <- as.data.frame(results_final) %>%
+  left_join(results %>% dplyr::select(record_id, modeled_treatment_failure = treatment_failure), by = 'record_id') %>%
   left_join(bind_rows(
     dt02 %>%
       mutate(subject_label_blinded = as.character(subject_label_blinded)), dt04
   ) %>%
-    mutate(record_id = as.numeric(as.factor(subject_label_blinded))), by = 'record_id') %>%
-  dplyr::select(names(as.data.frame(results1)), strata) %>%
+    mutate(record_id = subject_label_blinded), by = 'record_id') %>%
+  dplyr::select(names(as.data.frame(results_final)), strata, modeled_treatment_failure) %>%
   distinct(record_id, .keep_all = T) %>%
   mutate(y_hat_status = as.factor(ifelse(p_value < 0.05, 1, 2)),
          y = as.factor(ifelse(strata == 'early suppressions', 1, 2)) )
@@ -793,3 +795,9 @@ dt06 <- dt05 %>%
   tbl_summary(by = strata
   )
 dt06
+
+# dt07 <- dt05 %>%
+#   dplyr::select(modeled_treatment_failure, flagged) %>%
+#   tbl_summary(by = modeled_treatment_failure
+#   )
+# dt07
