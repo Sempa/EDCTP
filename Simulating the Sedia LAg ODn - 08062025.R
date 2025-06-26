@@ -240,7 +240,8 @@ simulate_ODn_decay2 <- function(coef_estimates, coef_se,
                                 max_follow_up = 10,
                                 time_interval = 0.5,
                                 noise_model = 1,
-                                failure_prob = 0.2,
+                                # failure_prob = 0.2,
+                                failure_rate = 0.05,
                                 dropout_prob = 0.1,
                                 rebound_model = c("sigmoid", "logistic")) {
   library(truncnorm)
@@ -252,9 +253,10 @@ simulate_ODn_decay2 <- function(coef_estimates, coef_se,
   # baselines <- truncnorm::rtruncnorm(n_individuals, mean = baseline_mean, sd = baseline_sd, a = 0.03, b = 7.4)
   baselines <- runif(n_individuals, min = 0.03, max = 7.4)
   fail_flags <- runif(n_individuals) < failure_prob
-  fail_times <- ifelse(fail_flags, runif(n_individuals, min = 1, max = max_follow_up - 3 * time_interval), NA)
-  dropout_flags <- ifelse(!fail_flags, runif(n_individuals) < dropout_prob, FALSE)
-  dropout_times <- ifelse(dropout_flags, runif(n_individuals, min = 1, max = max_follow_up), NA)
+  # fail_times <- ifelse(fail_flags, runif(n_individuals, min = 1, max = max_follow_up - 3 * time_interval), NA)
+  fail_times <- log(runif(n_individuals, min = 0, max = 1)) / (-1 * failure_rate)
+  # dropout_flags <- ifelse(!fail_flags, runif(n_individuals) < dropout_prob, FALSE)
+  # dropout_times <- ifelse(dropout_flags, runif(n_individuals, min = 1, max = max_follow_up), NA)
   
   generate_log_decay_coefs <- function() {
     a <- rnorm(1, mean = coef_estimates[[1]], sd = coef_se[[1]])
@@ -378,7 +380,7 @@ simulate_ODn_decay2 <- function(coef_estimates, coef_se,
 result <- simulate_ODn_decay2(
   coef_estimates = coef_estimates,
   coef_se = coef_se,
-  n_individuals = 10000,
+  n_individuals = 10,
   baseline_mean = 3.47,
   baseline_sd = 1.55,
   sigma_0 = -0.01469,
