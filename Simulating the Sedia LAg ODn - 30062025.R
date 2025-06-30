@@ -180,87 +180,80 @@ slope_sd       <- sd(individual_models$slope, na.rm = TRUE)
 coef_estimates <- list(intercept_mean, slope_mean)
 coef_se <- list(intercept_sd, slope_sd)
 
-simulate_ODn_3 <- function(
-    coef_estimates, coef_se,
-    n_individuals,
-    sigma_0, slope_sigma,
-    baseline_noise, fraction,
-    failure_prob = 0.2,
-    max_follow_up = 10,
-    time_interval = 0.5,
-    noise_model = 1
-) {
-  # library(dplyr)
+simulate_ODn_3 <- function(coef_estimates, coef_se,
+                           n_individuals,
+                           sigma_0, slope_sigma,
+                           baseline_noise, fraction,
+                           max_follow_up = 10,
+                           time_interval = 0.5,
+                           noise_model = 1,
+                           failure_rate = 0.2) {
   
-  # Generate time vector
+  library(dplyr)
+  library(truncnorm)
+  
   full_time_points <- seq(0, max_follow_up, by = time_interval)
   
-  # Generate individual-level parameters
-  a0_values <- rnorm(n_individuals, mean = coef_estimates[[1]], sd = coef_se[[1]])
+  # Baseline a0 from truncated normal distribution between 0.03 and 7.4
+  a0_values <- truncnorm::rtruncnorm(n_individuals, a = 0.03, b = 7.4,
+                                     mean = coef_estimates[[1]], sd = coef_se[[1]])
   lambda_i_values <- rnorm(n_individuals, mean = coef_estimates[[2]], sd = coef_se[[2]])
+  
+  # Failure times sampled from exponential distribution (via inverse CDF)
+  fail_times <- log(runif(n_individuals, min = 0, max = 1)) / (-1 * failure_rate)
+  fail_times <- pmin(fail_times, max_follow_up)
+  
+  # Rebound rate gamma
   gamma_values <- runif(n_individuals, min = 0.01, max = 0.05)
   
-  # Generate failure times using exponential distribution logic
-  fail_times <- log(runif(n_individuals, min = 0, max = 1)) / (-1 * failure_prob)
-  failed_flags <- fail_times < max_follow_up
+  # Noise functions
+  compute_noise_sd1 <- function(odn) pmax(sigma_0 + slope_sigma * odn, 0.01)
+  compute_noise_sd2 <- function(odn) pmax(baseline_noise + fraction * odn, 0.01)
   
-  # Preallocate results
+  # Storage
   decay_data_list <- vector("list", n_individuals)
-  follow_up_years <- rep(NA, n_individuals)
   
   for (i in 1:n_individuals) {
     a0 <- a0_values[i]
     lambda_i <- lambda_i_values[i]
     gamma <- gamma_values[i]
     failure_time <- fail_times[i]
-    has_failed <- failed_flags[i]
     
-    # Time points depending on failure status
-    if (has_failed) {
-      censor_time <- failure_time + 3 * time_interval
-      times <- full_time_points[full_time_points <= censor_time]
-    } else {
-      times <- full_time_points
-      censor_time <- max_follow_up
-    }
-    follow_up_years[i] <- max(times)
+    # Censor at 3 visits after failure
+    censor_time <- min(failure_time + 3 * time_interval, max_follow_up)
+    times <- full_time_points[full_time_points <= censor_time]
     
-    # Compute true ODn values
-    odn_true <- ifelse(
-      times < failure_time,
-      a0 * exp(-lambda_i * times),
-      pmin(a0, a0 * (1 - (1 - exp(-lambda_i * failure_time)) * exp(-gamma * times)))
-    )
+    odn_true <- ifelse(times < failure_time,
+                       a0 * exp(-lambda_i * times),
+                       pmin(a0 * (1 - (1 - exp(-lambda_i * failure_time)) * 
+                                    exp(-gamma * (times - failure_time))), a0))
     
-    # Add noise
-    noise_sd <- if (noise_model == 1) {
-      pmax(sigma_0 + slope_sigma * odn_true, 0.01)
-    } else {
-      pmax(baseline_noise + fraction * odn_true, 0.01)
+    # Apply noise while preserving baseline at time = 0
+    noise_sd <- if (noise_model == 1) compute_noise_sd1(odn_true) else compute_noise_sd2(odn_true)
+    odn_noisy <- odn_true
+    if (length(odn_noisy) > 1) {
+      odn_noisy[-1] <- pmin(
+        pmax(rnorm(length(times) - 1, mean = odn_true[-1], sd = noise_sd[-1]), 0.001),
+        a0
+      )
     }
     
-    noisy_odn <- odn_true
-    if (length(times) > 1) {
-      noisy_odn[-1] <- pmax(rnorm(length(times) - 1, mean = odn_true[-1], sd = noise_sd[-1]), 0.001)
-    }
-    
-    decay_data_list[[i]] <- data.frame(
+    decay_data_list[[i]] <- tibble(
       individual = i,
       time = times,
-      value = noisy_odn
+      value = odn_noisy
     )
   }
   
-  decay_data <- do.call(rbind, decay_data_list)
-  model_parameters <- data.frame(
+  decay_data <- bind_rows(decay_data_list)
+  
+  model_parameters <- tibble(
     id = 1:n_individuals,
     a = a0_values,
     b = lambda_i_values,
     lambda_i = lambda_i_values,
     gamma = gamma_values,
-    failure_time = fail_times,
-    treatment_failure = failed_flags,
-    follow_up_years = follow_up_years
+    failure_time = fail_times
   )
   
   return(list(
@@ -268,7 +261,6 @@ simulate_ODn_3 <- function(
     model_parameters = model_parameters
   ))
 }
-
 
 # Call simulate_ODn_3
 results <- simulate_ODn_3(
@@ -355,3 +347,67 @@ ggplot_plots <- ggpubr::ggarrange(
 )
 
 ggplot_plots
+
+detect_ODn_upticks <- function(decay_data, model_parameters, sd_option = c("fixed", "rolling_window", "rolling_all"), z_threshold = 1.96) {
+  library(dplyr)
+  library(tidyr)
+  
+  sd_option <- match.arg(sd_option)
+  fixed_sd <- 1.30123  # fixed standard deviation
+  
+  # Merge model_parameters to bring in failure_time
+  decay_data <- decay_data %>%
+    left_join(model_parameters %>% select(individual = id, failure_time), by = "individual")
+  
+  # Compute z-scores and flags
+  decay_data <- decay_data %>%
+    arrange(individual, time) %>%
+    group_by(individual) %>%
+    mutate(
+      z_score = sapply(seq_along(value), function(i) {
+        if (i < 3) return(NA_real_)
+        
+        prev_vals <- value[max(1, i - 4):(i - 1)]
+        if (length(prev_vals) < 1) return(NA_real_)
+        
+        mean_prev <- mean(prev_vals)
+        
+        sd_val <- switch(sd_option,
+                         fixed = fixed_sd,
+                         rolling_window = if (length(prev_vals) > 1) sd(prev_vals) else NA_real_,
+                         rolling_all = if (i > 2) sd(value[1:(i - 1)]) else NA_real_)
+        
+        if (is.na(sd_val) || sd_val == 0) return(NA_real_)
+        
+        (value[i] - mean_prev) / sd_val
+      }),
+      ODn_uptick_flag = z_score > z_threshold,
+      uptick_time = ifelse(row_number() == which(ODn_uptick_flag)[1], time, NA_real_)
+    ) %>%
+    fill(uptick_time, .direction = "down") %>%
+    group_by(individual) %>%
+    mutate(uptick_time = ifelse(row_number() == 1, NA_real_, uptick_time)) %>%
+    ungroup() %>%
+    mutate(time_since_failure = ifelse(ODn_uptick_flag,
+                                       ifelse(!is.na(failure_time), time - failure_time, Inf),
+                                       NA_real_))
+  
+  return(decay_data)
+}
+
+# updated_decay_data <- detect_ODn_upticks(decay_data, model_parameters, sd_option = "rolling_window", z_threshold = 1.96)
+
+
+# Example usage
+# Assuming `decay_data` is already defined and loaded:
+# Detect upticks using fixed SD and threshold of 1.96
+updated_decay_data <- detect_ODn_upticks(decay_data, model_parameters, sd_option = "fixed", z_threshold = 1.96)
+table(updated_decay_data$ODn_uptick_flag)
+# Use rolling window SD
+updated_decay_data2 <- detect_ODn_upticks(decay_data, model_parameters, sd_option = "rolling_window", z_threshold = 1.96)
+table(updated_decay_data2$ODn_uptick_flag)
+# Use cumulative rolling SD
+updated_decay_data3 <- detect_ODn_upticks(decay_data, model_parameters, sd_option = "rolling_all", z_threshold = 1.96)
+table(updated_decay_data3$ODn_uptick_flag)
+# View a few rows to inspect
+head(updated_decay_data)

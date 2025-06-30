@@ -496,7 +496,7 @@ for (i in seq_along(ids)) {
 results_df <- do.call(rbind, results)
 
 results <- results_df %>%
-  mutate(record_id = id)
+  mutate(record_id = ids)
 head(results)
 saveRDS(results, 'results_100k.rds')
 results <- readRDS('results_100k.rds')
