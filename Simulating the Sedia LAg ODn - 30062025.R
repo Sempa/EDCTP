@@ -190,14 +190,14 @@ generate_model_parameters <- function(
   
   a0_values <- truncnorm::rtruncnorm(n_individuals, a = 0.03, b = 7.4,
                                      mean = coef_estimates[[1]], sd = coef_se[[1]])
-  lambda_i_values <- rnorm(n_individuals, mean = coef_estimates[[2]], sd = coef_se[[2]])
+  lambda_i_values <- truncnorm::rtruncnorm(n_individuals, a = 0.001,
+                                           mean = coef_estimates[[2]], sd = coef_se[[2]])
   fail_times <- log(runif(n_individuals, min = 0, max = 1)) / (-1 * failure_rate)
   gamma_values <- runif(n_individuals, min = 0.01, max = 0.05)
   
   model_parameters <- tibble::tibble(
     id = 1:n_individuals,
     a = a0_values,
-    b = lambda_i_values,
     lambda_i = lambda_i_values,
     gamma = gamma_values,
     failure_time = fail_times
@@ -215,18 +215,20 @@ summary(model_parameters$failure_time)
 
 generate_decay_data <- function(model_parameters, 
                                 max_follow_up = 10,
-                                time_interval = 0.5,
-                                noise_model = 1,
+                                time_interval = 0.25,
+                                noise_model = 2,
                                 sigma_0 = 0.1,
                                 slope_sigma = 0.05,
                                 baseline_noise = 0.1,
                                 fraction = 0.1) {
-  
+  set.seed(123)
   full_time_points <- seq(0, max_follow_up, by = time_interval)
-  compute_noise_sd1 <- function(odn) pmax(sigma_0 + slope_sigma * odn, 0.01)
-  compute_noise_sd2 <- function(odn) pmax(baseline_noise + fraction * odn, 0.01)
+  compute_noise_sd1 <- function(odn) (sigma_0 + slope_sigma * odn)
+  compute_noise_sd2 <- function(odn) (baseline_noise + fraction * odn)
   
   decay_data_list <- vector("list", nrow(model_parameters))
+  
+  # browser()
   
   for (i in seq_len(nrow(model_parameters))) {
     a0 <- model_parameters$a[i]
@@ -237,9 +239,11 @@ generate_decay_data <- function(model_parameters,
     
     odn_true <- ifelse(times < failure_time,
                        a0 * exp(-lambda_i * times),
-                       pmin(a0 * (1 - (1 - exp(-lambda_i * failure_time)) * 
-                                    exp(-gamma * (times))), a0))
-    
+                       a0 - a0 * (1 - exp(-lambda_i * failure_time)) * exp(-gamma * times)
+                       # a0 * (1 - (1 - exp(-lambda_i * failure_time)) * 
+                       #              exp(-gamma * (times)))
+                       )
+    # browser()
     noise_sd <- if (noise_model == 1) compute_noise_sd1(odn_true) else compute_noise_sd2(odn_true)
     odn_noisy <- odn_true
     if (length(odn_noisy) > 1) {
@@ -247,12 +251,12 @@ generate_decay_data <- function(model_parameters,
         pmax(rnorm(length(times) - 1, mean = odn_true[-1], sd = noise_sd[-1]), 0.001),
         a0
       )
-    }
+    }#rnorm(length(times) - 1, mean = odn_true[-1], sd = noise_sd[-1])
     
     decay_data_list[[i]] <- tibble::tibble(
       individual = model_parameters$id[i],
       time = times,
-      value = odn_noisy,
+      value = odn_true, #odn_noisy,
       failure_time = failure_time
     )
   }
@@ -269,8 +273,8 @@ decay_data <- generate_decay_data(
   baseline_noise = 0.2,
   fraction = 0.3,
   max_follow_up = 10,
-  time_interval = 0.5,
-  noise_model = 1
+  time_interval = 0.25,
+  noise_model = 2
 )
 
 # Call simulate_ODn_3
@@ -286,10 +290,6 @@ decay_data <- generate_decay_data(
 #   time_interval = 0.5,
 #   noise_model = 1
 # )
-
-# Access outputs
-decay_data <- results$decay_data
-model_parameters <- results$model_parameters
 
 n_individuals <- 1000
 x <- full_dataset %>%
@@ -362,11 +362,13 @@ detect_ODn_upticks <- function(
     sd_option = c("fixed", "rolling_window", "rolling_all"), 
     z_threshold = 1.96) {
   
+  set.seed(123)
+  
   library(dplyr)
   library(tidyr)
   
   sd_option <- match.arg(sd_option)
-  fixed_sd <- 1.85  # Sedia control-derived fixed SD
+  fixed_sd <- 1.85  # Sedia Blinded control-derived fixed SD
   
   decay_data <- decay_data %>%
     arrange(individual, time) %>%
@@ -414,7 +416,9 @@ detect_ODn_upticks <- function(
 updated_decay_data <- detect_ODn_upticks(decay_data, sd_option = "fixed", z_threshold = 1.96)
 table(updated_decay_data$ODn_uptick_flag)
 # Use rolling window SD
-updated_decay_data2 <- detect_ODn_upticks(decay_data, sd_option = "rolling_window", z_threshold = 1.96)
+updated_decay_data2 <- detect_ODn_upticks(decay_data %>%
+                                            filter(time %in% c(seq(0,10,0.25))), 
+                                          sd_option = "rolling_window", z_threshold = 1.96)
 table(updated_decay_data2$ODn_uptick_flag)
 # Use cumulative rolling SD
 updated_decay_data3 <- detect_ODn_upticks(decay_data, sd_option = "rolling_all", z_threshold = 1.96)
@@ -431,32 +435,41 @@ summary_df <- updated_decay_data2 %>%
       NA_real_
     },
     failure_time = unique(failure_time),
-    time_diff = if (!is.na(uptick_time)) uptick_time - failure_time else NA_real_,
+    failure_time_capped = min(unique(failure_time), 10),
+    time_diff = if (any(ODn_uptick_flag, na.rm = TRUE)) {
+      uptick_time - unique(failure_time_capped)
+    } else {
+      NA_real_
+    },
     .groups = "drop"
   )
 
+
 # Counts
 n_without_uptick <- sum(!summary_df$has_uptick)
+total_uptick_visits <- sum(updated_decay_data2$ODn_uptick_flag, na.rm = TRUE)
 n_with_uptick <- sum(summary_df$has_uptick) # & (summary_df$failure_time >1 & summary_df$failure_time <= 9)
 n_fail_lt_10_with_uptick <- sum(summary_df$has_uptick & summary_df$failure_time < 10)
 n_fail_gt_10_with_uptick <- sum(summary_df$has_uptick & summary_df$failure_time >= 10)
+n_no_uptick_fail_lt_10 <- sum(!summary_df$has_uptick & summary_df$failure_time < 10)
 delays_to_detection_of_rebound <- quantile(summary_df$time_diff, na.rm = TRUE)
 
 # View or print results
 print(paste("Number without ODn uptick:", n_without_uptick))
+print(paste("Total number of ODn uptick visits in cohort:", total_uptick_visits))
 print(paste("Number with ODn uptick:", n_with_uptick))
 print(paste("Number with ODn uptick and failure_time < 10:", n_fail_lt_10_with_uptick))
 print(paste("Number with ODn uptick and failure_time >= 10:", n_fail_gt_10_with_uptick))
-print(paste("Distribution of delays to detection (uptick time-failure time)",delays_to_detection_of_rebound))
+print(paste("Number without ODn uptick and failure_time < 10:", n_no_uptick_fail_lt_10))
+print(paste("Distribution of delays to detection (uptick time-failure time)", delays_to_detection_of_rebound))
 
 # Add these summary metrics to the individual-level data
-summary_df <- summary_df %>%
-  mutate(
-    uptick_category = case_when(
-      has_uptick & failure_time < 10 ~ "Uptick with failure < 10",
-      has_uptick & failure_time >= 10 ~ "Uptick with failure ≥ 10",
-      !has_uptick ~ "No uptick"
-    )
-  )
-
+# summary_df <- summary_df %>%
+#   mutate(
+#     uptick_category = case_when(
+#       has_uptick & failure_time < 10 ~ "Uptick with failure < 10",
+#       has_uptick & failure_time >= 10 ~ "Uptick with failure ≥ 10",
+#       !has_uptick ~ "No uptick"
+#     )
+#   )
   
