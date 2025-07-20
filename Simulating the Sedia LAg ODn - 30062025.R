@@ -240,8 +240,6 @@ generate_decay_data <- function(model_parameters,
     odn_true <- ifelse(times < failure_time,
                        a0 * exp(-lambda_i * times),
                        a0 - a0 * (1 - exp(-lambda_i * failure_time)) * exp(-gamma * times)
-                       # a0 * (1 - (1 - exp(-lambda_i * failure_time)) * 
-                       #              exp(-gamma * (times)))
                        )
     # browser()
     noise_sd <- if (noise_model == 1) compute_noise_sd1(odn_true) else compute_noise_sd2(odn_true)
@@ -394,6 +392,7 @@ detect_ODn_upticks <- function(
     ) %>%
     mutate(
       uptick_time = ifelse(row_number() == which(ODn_uptick_flag)[1], time, NA_real_)
+      # the time of the first occurrence of an "uptick" flagged by ODn_uptick_flag, and assigns it to a new variable uptick_time. For all other rows, it assigns NA.
     ) %>%
     fill(uptick_time, .direction = "down") %>%
     mutate(
@@ -417,7 +416,7 @@ updated_decay_data <- detect_ODn_upticks(decay_data, sd_option = "fixed", z_thre
 table(updated_decay_data$ODn_uptick_flag)
 # Use rolling window SD
 updated_decay_data2 <- detect_ODn_upticks(decay_data %>%
-                                            filter(time %in% c(seq(0,10,0.25))), 
+                                            filter(time %in% c(seq(0,10,0.5))), 
                                           sd_option = "rolling_window", z_threshold = 1.96)
 table(updated_decay_data2$ODn_uptick_flag)
 # Use cumulative rolling SD
@@ -442,8 +441,15 @@ summary_df <- updated_decay_data2 %>%
       NA_real_
     },
     .groups = "drop"
-  )
-
+  ) 
+summary_df_updated = summary_df%>%
+  # filter(!is.na(uptick_time)) %>%
+  mutate(outcome = ifelse(failure_time<10, '1.Positive', '2.Negative'),
+         exposure = ifelse(uptick_time >= failure_time, '1.Positive',
+                           ifelse(uptick_time < failure_time & uptick_time != 0, '2.Negative', ''))) %>%
+  dplyr::select(outcome, exposure) %>%
+  tbl_summary(by = outcome)
+summary_df_updated
 
 # Counts
 n_without_uptick <- sum(!summary_df$has_uptick)
@@ -463,13 +469,43 @@ print(paste("Number with ODn uptick and failure_time >= 10:", n_fail_gt_10_with_
 print(paste("Number without ODn uptick and failure_time < 10:", n_no_uptick_fail_lt_10))
 print(paste("Distribution of delays to detection (uptick time-failure time)", delays_to_detection_of_rebound))
 
-# Add these summary metrics to the individual-level data
-# summary_df <- summary_df %>%
-#   mutate(
-#     uptick_category = case_when(
-#       has_uptick & failure_time < 10 ~ "Uptick with failure < 10",
-#       has_uptick & failure_time >= 10 ~ "Uptick with failure ≥ 10",
-#       !has_uptick ~ "No uptick"
-#     )
-#   )
+# Define the time sequences
+time_sequences <- list(
+  "quarter_years" = seq(0, 10, 0.25),
+  "all_timepoints" = seq(0, 10, 0.5),  # Note: seq(0, 10, 0) will not work; 0 step size is invalid
+  "yearly" = seq(0, 10, 1)
+)
+
+# Fix the all_timepoints sequence (0 step is invalid)
+# Assuming you meant to use all available time values in `decay_data`
+# If so, use: unique(decay_data$time)
+time_sequences$all_timepoints <- sort(unique(decay_data$time))
+
+# Create a results list
+summary_results <- lapply(names(time_sequences), function(name) {
+  time_seq <- time_sequences[[name]]
   
+  # Apply uptick detection to filtered decay_data
+  updated_data <- detect_ODn_upticks(
+    decay_data %>% filter(time %in% time_seq),
+    sd_option = "rolling_window",
+    z_threshold = 1.96
+  )
+  
+  # Summarise mean and median time_since_failure
+  summary_stats <- updated_data %>%
+    summarise(
+      mean_time_since_failure = mean(time_since_failure, na.rm = TRUE),
+      median_time_since_failure = median(time_since_failure, na.rm = TRUE)
+    )
+  
+  summary_stats$sequence_name <- name
+  summary_stats
+})
+
+# Combine results into a single data frame
+summary_df <- bind_rows(summary_results) %>%
+  select(sequence_name, everything())
+
+# View results
+print(summary_df)
