@@ -246,8 +246,8 @@ generate_decay_data <- function(model_parameters,
     odn_noisy <- odn_true
     if (length(odn_noisy) > 1) {
       odn_noisy[-1] <- pmin(
-        pmax(rnorm(length(times) - 1, mean = odn_true[-1], sd = noise_sd[-1]), 0.001),
-        a0
+        pmax(rnorm(length(times) - 1, mean = odn_true[-1], sd = noise_sd[-1]), 0.001), # prevents recording values <0.001
+        a0 # prevents recording values > baseline
       )
     }#rnorm(length(times) - 1, mean = odn_true[-1], sd = noise_sd[-1])
     
