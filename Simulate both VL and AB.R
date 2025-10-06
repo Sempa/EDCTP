@@ -167,7 +167,7 @@ detect_antibody_upticks <- function(
     z_threshold = 1.96,
     min_history = 2,        # minimum number of past values required
     sd_option = c("fixed", "expanding"), 
-    fixed_sd = 0.15,        # optional fixed SD, can tune based on assay variability
+    fixed_sd = 0.3141,        # optional fixed SD, can tune based on assay variability
     seed = 123
 ) {
   set.seed(seed)
@@ -202,7 +202,7 @@ detect_antibody_upticks <- function(
 # Apply to simulated data
 antibody_flags <- detect_antibody_upticks(sim_df, 
                                           z_threshold = 1.96, 
-                                          sd_option = "expanding")
+                                          sd_option = "fixed") #expanding
 
 # Inspect flagged individuals
 head(antibody_flags %>% filter(uptick_flag == TRUE))
@@ -295,3 +295,9 @@ roc_obj <- roc(
 )
 plot(roc_obj)
 auc(roc_obj)
+
+x <- comparison_df %>%
+  mutate(detected = as.character(detected)) %>%
+  dplyr::select(detected, true_rebound) %>%
+  tbl_summary(by = true_rebound)
+x
