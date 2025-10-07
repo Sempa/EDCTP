@@ -14,6 +14,7 @@ library(glmmTMB)
 library(purrr)
 library(patchwork)
 library(tidyr)
+library(pROC)
 
 model_ab_data <- rbind(readRDS("data/model_data.rds") %>%
                       mutate(phase = "suppressed"),
@@ -165,32 +166,44 @@ p1 + p2
 detect_antibody_upticks <- function(
     antibody_data,
     z_threshold = 1.96,
-    min_history = 2,        # minimum number of past values required
+    min_history = 2,          # applies only if sd_option = "expanding"
     sd_option = c("fixed", "expanding"), 
-    fixed_sd = 0.3141,        # optional fixed SD, can tune based on assay variability
+    fixed_sd = 0.3141,        # assay variability
     seed = 123
 ) {
   set.seed(seed)
   sd_option <- match.arg(sd_option)
+  
+  # adjust min_history dynamically
+  min_history_used <- if (sd_option == "fixed") 1 else min_history
   
   antibody_data <- antibody_data %>%
     arrange(id, week) %>%
     group_by(id) %>%
     mutate(
       z_score = sapply(seq_along(antibody), function(i) {
-        if (i <= min_history) return(NA_real_)
+        if (i <= min_history_used) return(NA_real_)
+        
+        # use previous values to compute the historical mean
         past_vals <- antibody[1:(i - 1)]
         mean_past <- mean(past_vals, na.rm = TRUE)
+        
+        # define SD according to chosen method
         sd_val <- switch(sd_option,
                          fixed = fixed_sd,
                          expanding = sd(past_vals, na.rm = TRUE))
+        
         if (is.na(sd_val) || sd_val == 0) return(NA_real_)
+        
+        # compute z-score
         (antibody[i] - mean_past) / sd_val
       }),
+      
+      # flag significant upticks
       uptick_flag = z_score > z_threshold
     ) %>%
     mutate(
-      # identify first uptick per patient
+      # identify the first uptick per patient
       uptick_time = ifelse(row_number() == min(which(uptick_flag), na.rm = TRUE), week, NA_real_)
     ) %>%
     fill(uptick_time, .direction = "down") %>%
@@ -198,6 +211,7 @@ detect_antibody_upticks <- function(
   
   return(antibody_data)
 }
+
 
 # Apply to simulated data
 antibody_flags <- detect_antibody_upticks(sim_df, 
@@ -287,13 +301,26 @@ performance <- tibble(
 
 performance
 
-library(pROC)
+ab_summary2 <- antibody_flags %>%
+  group_by(id) %>%
+  summarise(max_antibody = max(antibody, na.rm = TRUE)) %>%
+  ungroup()
+
+roc_data <- ab_summary2 %>%
+  left_join(params %>% select(id, t_reb, rebound), by = "id") %>%
+  mutate(
+    rebound_flag = rebound == 1,   # TRUE if rebound
+    valid = !is.na(max_antibody) & !is.na(rebound_flag)
+  ) %>%
+  filter(valid)
+
 roc_obj <- roc(
-  response = !is.na(comparison_df$t_reb),  # true rebound (yes/no)
-  predictor = comparison_df$max_antibody,  # or mean, last, or modeled antibody level
-  direction = "<"
+  response = roc_data$rebound_flag,
+  predictor = roc_data$max_antibody,
+  direction = "<"  # lower antibody → less likely rebound
 )
-plot(roc_obj)
+
+plot(roc_obj, col = "blue", main = "ROC: Antibody vs Viral Rebound")
 auc(roc_obj)
 
 x <- comparison_df %>%
@@ -301,3 +328,7 @@ x <- comparison_df %>%
   dplyr::select(detected, true_rebound) %>%
   tbl_summary(by = true_rebound)
 x
+y <- comparison_df %>%
+  filter(!is.na(t_reb) & !is.na(AB_suspected_failure_time))
+mean(y$AB_suspected_failure_time)
+sd(y$AB_suspected_failure_time)
