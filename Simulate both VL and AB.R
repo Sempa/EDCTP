@@ -162,20 +162,69 @@ p2 <- ggplot(sim_df, aes(x = week, y = antibody, group = id, color = factor(rebo
 
 p1 + p2
 
-# Detect antibody upticks
+# # Detect antibody upticks
+# detect_antibody_upticks <- function(
+#     antibody_data,
+#     z_threshold = 1.96,
+#     min_history = 2,          # applies only if sd_option = "expanding"
+#     sd_option = c("fixed", "expanding"), 
+#     fixed_sd = 0.3141,        # assay variability
+#     seed = 123
+# ) {
+#   set.seed(seed)
+#   sd_option <- match.arg(sd_option)
+#   
+#   # adjust min_history dynamically
+#   min_history_used <- if (sd_option == "fixed") 1 else min_history
+#   
+#   antibody_data <- antibody_data %>%
+#     arrange(id, week) %>%
+#     group_by(id) %>%
+#     mutate(
+#       z_score = sapply(seq_along(antibody), function(i) {
+#         if (i <= min_history_used) return(NA_real_)
+#         
+#         # use previous values to compute the historical mean
+#         past_vals <- antibody[1:(i - 1)]
+#         mean_past <- mean(past_vals, na.rm = TRUE)
+#         
+#         # define SD according to chosen method
+#         sd_val <- switch(sd_option,
+#                          fixed = fixed_sd,
+#                          expanding = sd(past_vals, na.rm = TRUE))
+#         
+#         if (is.na(sd_val) || sd_val == 0) return(NA_real_)
+#         
+#         # compute z-score
+#         (antibody[i] - mean_past) / sd_val
+#       }),
+#       
+#       # flag significant upticks
+#       uptick_flag = z_score > z_threshold
+#     ) %>%
+#     mutate(
+#       # identify the first uptick per patient
+#       uptick_time = ifelse(row_number() == min(which(uptick_flag), na.rm = TRUE), week, NA_real_)
+#     ) %>%
+#     fill(uptick_time, .direction = "down") %>%
+#     ungroup()
+#   
+#   return(antibody_data)
+# }
+
 detect_antibody_upticks <- function(
     antibody_data,
     z_threshold = 1.96,
-    min_history = 2,          # applies only if sd_option = "expanding"
-    sd_option = c("fixed", "expanding"), 
-    fixed_sd = 0.3141,        # assay variability
+    min_history = 2,                   # used only for expanding SD
+    sd_option = c("fixed", "expanding", "heteroskedastic"),
+    fixed_sd = 0.3141,                 # for fixed SD
     seed = 123
 ) {
   set.seed(seed)
   sd_option <- match.arg(sd_option)
   
-  # adjust min_history dynamically
-  min_history_used <- if (sd_option == "fixed") 1 else min_history
+  # Adjust minimum history requirement based on SD method
+  min_history_used <- if (sd_option %in% c("fixed", "heteroskedastic")) 1 else min_history
   
   antibody_data <- antibody_data %>%
     arrange(id, week) %>%
@@ -184,27 +233,34 @@ detect_antibody_upticks <- function(
       z_score = sapply(seq_along(antibody), function(i) {
         if (i <= min_history_used) return(NA_real_)
         
-        # use previous values to compute the historical mean
+        # Past antibody values up to the current timepoint
         past_vals <- antibody[1:(i - 1)]
         mean_past <- mean(past_vals, na.rm = TRUE)
         
-        # define SD according to chosen method
-        sd_val <- switch(sd_option,
-                         fixed = fixed_sd,
-                         expanding = sd(past_vals, na.rm = TRUE))
+        # Choose SD calculation method
+        sd_val <- switch(
+          sd_option,
+          fixed = fixed_sd,
+          expanding = sd(past_vals, na.rm = TRUE),
+          heteroskedastic = max(0.001, -0.01469 + 0.14513 * mean_past)  # Linear SD model
+        )
         
-        if (is.na(sd_val) || sd_val == 0) return(NA_real_)
+        if (is.na(sd_val) || sd_val <= 0) return(NA_real_)
         
-        # compute z-score
+        # Compute Z-score: how many SDs above the mean is the current value?
         (antibody[i] - mean_past) / sd_val
       }),
       
-      # flag significant upticks
+      # Flag upticks that exceed the threshold
       uptick_flag = z_score > z_threshold
     ) %>%
     mutate(
-      # identify the first uptick per patient
-      uptick_time = ifelse(row_number() == min(which(uptick_flag), na.rm = TRUE), week, NA_real_)
+      # Mark the first time a significant uptick occurs per patient
+      uptick_time = ifelse(
+        row_number() == min(which(uptick_flag), na.rm = TRUE),
+        week,
+        NA_real_
+      )
     ) %>%
     fill(uptick_time, .direction = "down") %>%
     ungroup()
@@ -212,11 +268,10 @@ detect_antibody_upticks <- function(
   return(antibody_data)
 }
 
-
 # Apply to simulated data
 antibody_flags <- detect_antibody_upticks(sim_df, 
                                           z_threshold = 1.96, 
-                                          sd_option = "fixed") #expanding
+                                          sd_option = "heteroskedastic") #fixed,expanding
 
 # Inspect flagged individuals
 head(antibody_flags %>% filter(uptick_flag == TRUE))
