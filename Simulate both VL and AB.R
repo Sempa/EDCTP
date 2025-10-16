@@ -490,14 +490,120 @@ res_annual <- run_antibody_detection(sim_df, params, interval = "annual")
 
 # Access results
 ## weekly
-res_weekly$summary_stats
-res_weekly$table_results
-res_weekly$gtsummary
+res_weekly$summary_stats; res_weekly$table_results; res_weekly$gtsummary
 ## Biannual
-res_biannual$summary_stats
-res_biannual$table_results
-res_biannual$gtsummary
+res_biannual$summary_stats; res_biannual$table_results; res_biannual$gtsummary
 ## Annual
-res_annual$summary_stats
-res_annual$table_results
-res_annual$gtsummary
+res_annual$summary_stats; res_annual$table_results; res_annual$gtsummary
+
+library(dplyr)
+library(gtsummary)
+
+run_antibody_detection_interval <- function(sim_df, params, 
+                                            interval = c("weekly", "biannual", "annual"),
+                                            z_threshold = 1.96,
+                                            sd_option = "fixed") {
+  interval <- match.arg(interval)
+  
+  # Subset sim_df by chosen interval
+  week_seq <- switch(interval,
+                     weekly = unique(sim_df$week),
+                     biannual = seq(0, max(sim_df$week, na.rm = TRUE), 26),
+                     annual = seq(0, max(sim_df$week, na.rm = TRUE), 52))
+  sim_sub <- sim_df %>% filter(week %in% week_seq)
+  
+  # Detect antibody upticks
+  antibody_flags <- detect_antibody_upticks(sim_sub,
+                                            z_threshold = z_threshold,
+                                            sd_option = sd_option)
+  
+  # Earliest uptick per patient
+  ab_summary <- antibody_flags %>%
+    filter(uptick_flag == TRUE) %>%
+    group_by(id) %>%
+    summarise(AB_suspected_failure_time = min(uptick_time, na.rm = TRUE)) %>%
+    ungroup()
+  
+  # Merge with patient parameters
+  comparison_df <- params %>%
+    left_join(ab_summary, by = "id") %>%
+    mutate(
+      time_diff = AB_suspected_failure_time - t_reb,
+      detected = !is.na(AB_suspected_failure_time),
+      true_rebound = !is.na(t_reb),
+      correct_detection = case_when(
+        detected & true_rebound & AB_suspected_failure_time <= t_reb ~ "TP",
+        detected & true_rebound & AB_suspected_failure_time > t_reb  ~ "FP_late",
+        detected & !true_rebound                                     ~ "FP",
+        !detected & true_rebound                                     ~ "FN",
+        TRUE                                                         ~ "TN"
+      )
+    )
+  
+  # Summary stats for delays
+  summary_stats <- comparison_df %>%
+    filter(!is.na(time_diff)) %>%
+    summarise(
+      mean_delay = mean(time_diff, na.rm = TRUE),
+      sd_delay = sd(time_diff, na.rm = TRUE),
+      median_delay = median(time_diff, na.rm = TRUE),
+      n_events = n()
+    )
+  
+  # 2x2 detection table (using gtsummary)
+  detection_table <- comparison_df %>%
+    mutate(detected = as.character(detected)) %>%
+    select(detected, true_rebound) %>%
+    tbl_summary(by = true_rebound)
+  
+  # Compute diagnostic metrics
+  metrics <- comparison_df %>%
+    summarise(
+      TP = sum(correct_detection == "TP", na.rm = TRUE),
+      FP = sum(correct_detection %in% c("FP", "FP_late"), na.rm = TRUE),
+      FN = sum(correct_detection == "FN", na.rm = TRUE),
+      TN = sum(correct_detection == "TN", na.rm = TRUE)
+    ) %>%
+    mutate(
+      Sensitivity = TP / (TP + FN),
+      Specificity = TN / (TN + FP),
+      PPV = TP / (TP + FP),
+      NPV = TN / (TN + FN),
+      Accuracy = (TP + TN) / (TP + TN + FP + FN),
+      MeanDelay = summary_stats$mean_delay,
+      Scenario = interval,
+      LAg_assays_per_year = case_when(
+        interval == "weekly"   ~ 52 * nrow(params),
+        interval == "biannual" ~ 2  * nrow(params),
+        interval == "annual"   ~ 1  * nrow(params)
+      ),
+      VL_confirmatory_tests = TP + FP
+    ) %>%
+    select(
+      Scenario, LAg_assays_per_year, VL_confirmatory_tests,
+      Sensitivity, Specificity, PPV, NPV, Accuracy, MeanDelay
+    )
+  
+  # Return all outputs
+  list(
+    interval = interval,
+    antibody_flags = antibody_flags,
+    comparison_df = comparison_df,
+    summary_stats = summary_stats,
+    detection_table = detection_table,
+    metrics = metrics
+  )
+}
+
+# Example usage:
+res_weekly <- run_antibody_detection_interval(sim_df, params, interval = "weekly")
+res_biannual <- run_antibody_detection_interval(sim_df, params, interval = "biannual")
+res_annual <- run_antibody_detection_interval(sim_df, params, interval = "annual")
+
+# Access outputs:
+res_weekly$metrics
+res_weekly$detection_table
+res_biannual$metrics
+res_biannual$detection_table
+res_annual$metrics
+res_annual$detection_table
