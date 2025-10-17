@@ -29,7 +29,7 @@ summary(as.numeric((model_ab_data %>%
 summary(as.numeric((model_ab_data %>%
            filter(phase == "rebound"))$slope_link_log) * 7) ##intercept among rebound
 
-generate_patient_params <- function(n = 1000,
+generate_patient_params <- function(n = 100000,
                                     rebound_prop = 0.10,
                                     min_reb_wk = 0.6,
                                     max_reb_wk = 5,
@@ -132,7 +132,7 @@ simulate_patient_trajectories <- function(params,
 }
 
 ### 3. Run simulation
-params <- generate_patient_params(n = 1000, rebound_prop = 0.15)
+params <- generate_patient_params(n = 100000, rebound_prop = 0.15)
 sim_df <- simulate_patient_trajectories(params, seed = 42)
 
 ### 4. Visualization
@@ -532,8 +532,8 @@ run_antibody_detection_interval <- function(sim_df, params,
       detected = !is.na(AB_suspected_failure_time),
       true_rebound = !is.na(t_reb),
       correct_detection = case_when(
-        detected & true_rebound & AB_suspected_failure_time <= t_reb ~ "TP",
-        detected & true_rebound & AB_suspected_failure_time > t_reb  ~ "FP_late",
+        detected & true_rebound & AB_suspected_failure_time <= t_reb ~ "FP_early",
+        detected & true_rebound & AB_suspected_failure_time > t_reb  ~ "TP",
         detected & !true_rebound                                     ~ "FP",
         !detected & true_rebound                                     ~ "FN",
         TRUE                                                         ~ "TN"
@@ -560,7 +560,7 @@ run_antibody_detection_interval <- function(sim_df, params,
   metrics <- comparison_df %>%
     summarise(
       TP = sum(correct_detection == "TP", na.rm = TRUE),
-      FP = sum(correct_detection %in% c("FP", "FP_late"), na.rm = TRUE),
+      FP = sum(correct_detection %in% c("FP", "FP_early"), na.rm = TRUE),
       FN = sum(correct_detection == "FN", na.rm = TRUE),
       TN = sum(correct_detection == "TN", na.rm = TRUE)
     ) %>%
@@ -580,7 +580,7 @@ run_antibody_detection_interval <- function(sim_df, params,
       VL_confirmatory_tests = TP + FP
     ) %>%
     select(
-      Scenario, LAg_assays_per_year, VL_confirmatory_tests,
+      Scenario, LAg_assays_per_year, VL_confirmatory_tests, TP, FP, FN, TN,
       Sensitivity, Specificity, PPV, NPV, Accuracy, MeanDelay
     )
   
@@ -607,3 +607,4 @@ res_biannual$metrics
 res_biannual$detection_table
 res_annual$metrics
 res_annual$detection_table
+
