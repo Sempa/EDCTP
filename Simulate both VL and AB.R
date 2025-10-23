@@ -33,10 +33,11 @@ generate_patient_params <- function(n = 100000,
                                     rebound_prop = 0.10,
                                     min_reb_wk = 0.6,
                                     max_reb_wk = 5,
-                                    slope_range_vl = c(0.15, 0.16),
+                                    slope_range_vl = c(0.08, 0.22),
                                     ab_baseline_range = c(0.5, 1.5),
                                     ab_beta_range = c(0.1, 0.5), # AB growth rate
                                     ab_lag_range = c(2, 4)) { # AB growth time lag in comparison to the VL
+  set.seed(123)
   ids <- 1:n
   rebound_status <- rbinom(n, 1, rebound_prop)
   
@@ -132,7 +133,7 @@ simulate_patient_trajectories <- function(params,
 }
 
 ### 3. Run simulation
-params <- generate_patient_params(n = 10000, rebound_prop = 0.15)
+params <- generate_patient_params(n = 10000, rebound_prop = 0.10)
 sim_df <- simulate_patient_trajectories(params, seed = 42)
 
 ### 4. Visualization
