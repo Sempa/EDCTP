@@ -15,6 +15,7 @@ library(purrr)
 library(patchwork)
 library(tidyr)
 library(pROC)
+library(grid)
 
 model_ab_data <- rbind(readRDS("data/model_data.rds") %>%
                       mutate(phase = "suppressed"),
@@ -735,3 +736,80 @@ res_biannual$detection_table
 res_annual$metrics
 res_annual$detection_table
 
+
+
+# Publication-ready schematic: HIV Viral Load and Antibody Trajectories
+# Smoothed HIV Viral Load and Antibody Trajectories with Lagged Antibody Response
+# Viral load now drops sharply under ART and flattens below log10(20)
+
+t <- seq(0, 10, length.out = 1000)
+
+sigmoid <- function(x, xmid, k, ymin, ymax) {
+  ymin + (ymax - ymin) / (1 + exp(-k * (x - xmid)))
+}
+
+# --- Viral load: quick drop and suppression below log10(20) ---
+log_vl <- ifelse(t < 2,
+                 6 - 0.3 * (2 - t),  # Pre-ART (rising)
+                 ifelse(t < 7,
+                        sigmoid(t, xmid = 2.5, k = -3, ymin = 1.3, ymax = 6),   # Sharp drop, sustained suppression
+                        sigmoid(t, xmid = 8.5, k = 1.2, ymin = 1.3, ymax = 5.5)))  # Rebound
+
+# --- Antibody: lagged and smoother dynamics ---
+ab_lag1 <- 0.4
+ab_lag2 <- 0.5
+ab_lag3 <- 0.6
+
+antibody <- ifelse(t < 2,
+                   sigmoid(t - ab_lag1, xmid = 1.5, k = 1.5, ymin = 0.2, ymax = 1.2),
+                   ifelse(t < 7,
+                          sigmoid(t - ab_lag2, xmid = 4.5, k = -0.8, ymin = 0.5, ymax = 1.2),
+                          sigmoid(t - ab_lag3, xmid = 8.5, k = 0.8, ymin = 0.5, ymax = 1.3)))
+
+df <- data.frame(time = t, log_vl = log_vl, antibody = antibody)
+
+phases <- data.frame(
+  xmin = c(0, 2, 7),
+  xmax = c(2, 7, 10),
+  phase = c("Pre-ART", "During ART", "After Rebound")
+)
+
+col_vl <- "#D73027"   # professional red
+col_ab <- "#4575B4"   # professional blue
+
+p <- ggplot(df, aes(x = time)) +
+  geom_rect(data = phases, aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = phase),
+            alpha = 0.08, inherit.aes = FALSE) +
+  geom_line(aes(y = log_vl, color = "Viral load"), linewidth = 1.6, lineend = "round") +
+  geom_line(aes(y = antibody, color = "Antibody"), linewidth = 1.6, lineend = "round") +
+  scale_color_manual(values = c("Viral load" = col_vl, "Antibody" = col_ab)) +
+  scale_fill_manual(values = c("Pre-ART" = "grey85", "During ART" = "grey95", "After Rebound" = "grey85")) +
+  scale_y_continuous(breaks = NULL) +
+  labs(
+    x = "Time (years)",
+    y = expression(paste(log[10], " Viral load or Antibody level")),
+    color = "Marker",
+    fill = "Phase",
+    title = "HIV Viral Load and Antibody Trajectories with ART and Rebound"
+  ) +
+  annotate("text", x = 1, y = 5.8, label = "Pre-ART", size = 5, fontface = "bold") +
+  annotate("text", x = 4.5, y = 5.8, label = "ART Suppression", size = 5, fontface = "bold") +
+  annotate("text", x = 8.5, y = 5.8, label = "Viral Rebound", size = 5, fontface = "bold") +
+  # annotate("segment", x = 2.2, xend = 7, y = 2.5, yend = 2.5,
+  #          arrow = arrow(length = unit(0.25, "cm")), color = "black") +
+  # annotate("text", x = 4.5, y = 2.7, label = "Suppression (<20 copies/mL)", size = 4, color = "black") +
+  theme_minimal(base_size = 16) +
+  theme(
+    legend.position = "top",
+    legend.title = element_text(face = "bold"),
+    axis.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.margin = margin(10, 15, 10, 10)
+  )
+
+print(p)
+
+ggsave("epidemics/VL_Antibody_Trajectories_Lagged_SharpDrop.jpeg", p,
+       width = 10, height = 6, units = "in", dpi = 300)
