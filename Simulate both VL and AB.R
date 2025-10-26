@@ -64,7 +64,7 @@ generate_patient_params <- function(n = 100000,
 
 ### 2. Simulation function with separate max antibody levels
 simulate_patient_trajectories <- function(params,
-                                          times = seq(0, 156, by = 13),  # quarterly for 3 years
+                                          times = seq(0, 156, by = 1),  # weekly for 3 years
                                           detect_threshold = 1e3,
                                           max_vl = 1e6,
                                           A_max_fail = 4,          # max for failing patients
@@ -134,7 +134,7 @@ simulate_patient_trajectories <- function(params,
 }
 
 ### 3. Run simulation
-params <- generate_patient_params(n = 10000, rebound_prop = 0.10)
+params <- generate_patient_params(n = 1000, rebound_prop = 0.10)
 sim_df <- simulate_patient_trajectories(params, seed = 42)
 
 ### 4. Visualization

@@ -1,8 +1,14 @@
+library(readxl); library(tidyverse); library(gtsummary); library(dplyr)
+library(ggplot2); library(minpack.lm); library(nlme); library(splines)
+library(cowplot); library(distributions3); library("gghighlight")
+library(brolgar); library(glmmTMB); library(purrr); library(patchwork)
+library(tidyr); library(pROC); library(grid)
+
 generate_patient_params <- function(
     n = 10000,
     rebound_prop = 0.1,
-    min_reb_wk = 26,
-    max_reb_wk = 156,
+    min_reb_wk = 0.6,
+    max_reb_wk = 5,
     slope_range_ab_rebound = c(-0.229865, 0.262241),
     slope_range_ab_suppressed = c(-0.0725905, 0.1073314),
     intercept_ab_rebound = c(-10.3950, 5.5760),
@@ -36,7 +42,7 @@ generate_patient_params <- function(
 }
 
 simulate_patient_trajectories <- function(params,
-                                          times = seq(0, 156, by = 13),  # quarterly (3 years)
+                                          times = seq(0, 156, by = 1),  # quarterly (3 years)
                                           detect_threshold = 1000,
                                           max_vl = 1e6,
                                           A_max_fail = 4,
@@ -195,29 +201,44 @@ detect_antibody_upticks <- function(
 run_antibody_detection_interval <- function(sim_df, params, 
                                             interval = c("weekly", "biannual", "annual"),
                                             z_threshold = 1.96,
-                                            sd_option = "fixed") {
+                                            sd_option = "fixed",
+                                            delay_weeks = c(0, 4, 8, 12)) {
   interval <- match.arg(interval)
+  delay_weeks <- match.arg(as.character(delay_weeks), c("0", "4", "8", "12"))
+  delay_weeks <- as.numeric(delay_weeks)
   
-  # Subset sim_df by chosen interval
+  message(glue::glue("Running antibody detection with {interval} sampling and {delay_weeks}-week delay..."))
+  
+  # --- Apply antibody delay ---
+  sim_df <- sim_df %>%
+    group_by(id) %>%
+    mutate(
+      baseline_ab = first(antibody),
+      antibody_delayed = if_else(week <= delay_weeks, baseline_ab, antibody)
+    ) %>%
+    ungroup()
+  
+  # --- Select sampling frequency ---
   week_seq <- switch(interval,
-                     weekly = unique(sim_df$week),
+                     weekly   = unique(sim_df$week),
                      biannual = seq(0, max(sim_df$week, na.rm = TRUE), 26),
-                     annual = seq(0, max(sim_df$week, na.rm = TRUE), 52))
+                     annual   = seq(0, max(sim_df$week, na.rm = TRUE), 52))
+  
   sim_sub <- sim_df %>% filter(week %in% week_seq)
   
-  # Detect antibody upticks
-  antibody_flags <- detect_antibody_upticks(sim_sub,
+  # --- Detect antibody upticks (on delayed antibody) ---
+  antibody_flags <- detect_antibody_upticks(sim_sub %>% mutate(antibody = antibody_delayed),
                                             z_threshold = z_threshold,
                                             sd_option = sd_option)
   
-  # Earliest uptick per patient
+  # --- Summarise earliest uptick per patient ---
   ab_summary <- antibody_flags %>%
     filter(uptick_flag == TRUE) %>%
     group_by(id) %>%
     summarise(AB_suspected_failure_time = min(uptick_time, na.rm = TRUE)) %>%
     ungroup()
   
-  # Merge with patient parameters
+# --- Merge with patient parameters ---
   comparison_df <- params %>%
     left_join(ab_summary, by = "id") %>%
     mutate(
@@ -233,7 +254,7 @@ run_antibody_detection_interval <- function(sim_df, params,
       )
     )
   
-  # Summary stats for delays
+  # --- Summary stats for delay ---
   summary_stats <- comparison_df %>%
     filter(!is.na(time_diff)) %>%
     summarise(
@@ -243,13 +264,13 @@ run_antibody_detection_interval <- function(sim_df, params,
       n_events = n()
     )
   
-  # 2x2 detection table (using gtsummary)
+  # --- Detection table ---
   detection_table <- comparison_df %>%
     mutate(detected = as.character(detected)) %>%
-    select(detected, true_rebound) %>%
-    tbl_summary(by = true_rebound)
+    dplyr::select(detected, true_rebound) %>%
+    gtsummary::tbl_summary(by = true_rebound)
   
-  # Compute diagnostic metrics
+  # --- Compute metrics ---
   metrics <- comparison_df %>%
     summarise(
       TP = sum(correct_detection == "TP", na.rm = TRUE),
@@ -264,7 +285,7 @@ run_antibody_detection_interval <- function(sim_df, params,
       NPV = TN / (TN + FN),
       Accuracy = (TP + TN) / (TP + TN + FP + FN),
       MeanDelay = summary_stats$mean_delay,
-      Scenario = interval,
+      Scenario = paste(interval, "delay", delay_weeks, "weeks"),
       LAg_assays_per_year = case_when(
         interval == "weekly"   ~ 52 * nrow(params),
         interval == "biannual" ~ 2  * nrow(params),
@@ -277,26 +298,110 @@ run_antibody_detection_interval <- function(sim_df, params,
       Sensitivity, Specificity, PPV, NPV, Accuracy, MeanDelay
     )
   
-  # Return all outputs
+  # --- Return all outputs ---
   list(
     interval = interval,
+    delay_weeks = delay_weeks,
     antibody_flags = antibody_flags,
     comparison_df = comparison_df,
     summary_stats = summary_stats,
     detection_table = detection_table,
-    metrics = metrics
+    metrics = metrics,
+    ab_summary = ab_summary
   )
 }
 
-# Example usage:
-res_weekly <- run_antibody_detection_interval(sim_df, params, interval = "weekly")
-res_biannual <- run_antibody_detection_interval(sim_df, params, interval = "biannual")
-res_annual <- run_antibody_detection_interval(sim_df, params, interval = "annual")
+# # Example usage:
+# res_weekly <- run_antibody_detection_interval(sim_df, params, interval = "weekly")
+# res_biannual <- run_antibody_detection_interval(sim_df, params, interval = "biannual")
+# res_annual <- run_antibody_detection_interval(sim_df, params, interval = "annual")
+# 
+# # Access outputs:
+# res_weekly$metrics
+# res_weekly$detection_table
+# res_biannual$metrics
+# res_biannual$detection_table
+# res_annual$metrics
+# res_annual$detection_table
 
-# Access outputs:
-res_weekly$metrics
-res_weekly$detection_table
-res_biannual$metrics
-res_biannual$detection_table
-res_annual$metrics
-res_annual$detection_table
+
+# Define the delay weeks to loop over
+delay_weeks_vec <- c(0, 4, 8, 12)
+
+# Prepare empty lists
+metrics_list <- list()
+flags_list <- list()
+comparison_list <- list()
+
+for (d in delay_weeks_vec) {
+  
+  message("Running for delay_weeks = ", d)
+  
+  res_weekly <- run_antibody_detection_interval(
+    sim_df = sim_df,
+    params = params,
+    interval = "weekly",
+    z_threshold = 1.96,
+    sd_option = "fixed",
+    delay_weeks = d
+  )
+  
+  # Store metrics
+  m <- res_weekly$metrics %>% mutate(delay_weeks = d)
+  metrics_list[[as.character(d)]] <- m
+  
+  # Store antibody flags
+  f <- res_weekly$antibody_flags %>% mutate(delay_weeks = d)
+  flags_list[[as.character(d)]] <- f
+  
+  # Create comparison_df for this delay_weeks
+  ab_summary <- res_weekly$ab_summary  # assuming this exists inside res_weekly
+  
+  comparison_df <- params %>%
+    left_join(ab_summary, by = "id") %>%
+    mutate(
+      time_diff = AB_suspected_failure_time - t_reb,
+      detected = !is.na(AB_suspected_failure_time),
+      true_rebound = !is.na(t_reb),
+      correct_detection = case_when(
+        detected & true_rebound & AB_suspected_failure_time <= t_reb ~ "FP_early",
+        detected & true_rebound & AB_suspected_failure_time > t_reb  ~ "TP",
+        detected & !true_rebound                                     ~ "FP",
+        !detected & true_rebound                                     ~ "FN",
+        TRUE                                                         ~ "TN"
+      ),
+      delay_weeks = d
+    )
+  
+  comparison_list[[as.character(d)]] <- comparison_df
+}
+
+# Combine all runs into unified data frames
+metrics_all <- bind_rows(metrics_list)
+antibody_flags_all <- bind_rows(flags_list)
+comparison_all <- bind_rows(comparison_list)
+
+# # Convert delay_weeks to a factor (optional, for plotting)
+# metrics_all$delay_weeks <- factor(metrics_all$delay_weeks, levels = delay_weeks_vec)
+# antibody_flags_all$delay_weeks <- factor(antibody_flags_all$delay_weeks, levels = delay_weeks_vec)
+# comparison_all$delay_weeks <- factor(comparison_all$delay_weeks, levels = delay_weeks_vec)
+# 
+# # Quick checks
+# glimpse(metrics_all)
+# glimpse(antibody_flags_all)
+# glimpse(comparison_all)
+x=comparison_all %>%
+  filter(delay_weeks == 12) %>%
+  mutate(detected_flag = ifelse(time_diff <= 52, TRUE, 
+                               ifelse(time_diff > 52, FALSE, NA)),
+         detected_flag = ifelse(is.na(detected_flag), FALSE, detected_flag)) %>%
+  mutate(delay_weeks_6month = ifelse(time_diff<=52, 52 - time_diff, NA))
+summary(x$delay_weeks_6month)
+x1 <- x %>%
+  dplyr::select(true_rebound, detected_flag) %>%
+  tbl_cross(
+    row = detected_flag,
+    col = true_rebound,
+    percent = "column"
+  )
+x1
