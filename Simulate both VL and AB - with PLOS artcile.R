@@ -242,15 +242,17 @@ run_antibody_detection_interval <- function(sim_df, params,
   comparison_df <- params %>%
     left_join(ab_summary, by = "id") %>%
     mutate(
-      time_diff = AB_suspected_failure_time - t_reb,
+      # Adjust AB detection time for assay delay
+      AB_corrected_time = AB_suspected_failure_time - delay_weeks,
+      time_diff = AB_corrected_time - t_reb,
       detected = !is.na(AB_suspected_failure_time),
       true_rebound = !is.na(t_reb),
       correct_detection = case_when(
-        detected & true_rebound & AB_suspected_failure_time <= t_reb ~ "FP_early",
-        detected & true_rebound & AB_suspected_failure_time > t_reb  ~ "TP",
-        detected & !true_rebound                                     ~ "FP",
-        !detected & true_rebound                                     ~ "FN",
-        TRUE                                                         ~ "TN"
+        detected & true_rebound & AB_corrected_time <= t_reb ~ "FP_early",
+        detected & true_rebound & AB_corrected_time > t_reb  ~ "TP",
+        detected & !true_rebound                              ~ "FP",
+        !detected & true_rebound                              ~ "FN",
+        TRUE                                                  ~ "TN"
       )
     )
   
@@ -360,7 +362,7 @@ for (d in delay_weeks_vec) {
   comparison_df <- params %>%
     left_join(ab_summary, by = "id") %>%
     mutate(
-      time_diff = AB_suspected_failure_time - t_reb,
+      time_diff = AB_suspected_failure_time - d,
       detected = !is.na(AB_suspected_failure_time),
       true_rebound = !is.na(t_reb),
       correct_detection = case_when(
@@ -395,7 +397,7 @@ x=comparison_all %>%
   mutate(detected_flag = ifelse(time_diff <= 52, TRUE, 
                                ifelse(time_diff > 52, FALSE, NA)),
          detected_flag = ifelse(is.na(detected_flag), FALSE, detected_flag)) %>%
-  mutate(delay_weeks_6month = ifelse(time_diff<=52, 52 - time_diff, NA))
+  mutate(delay_weeks_6month = ifelse(time_diff<= 52, 52 - time_diff, NA))
 summary(x$delay_weeks_6month)
 x1 <- x %>%
   dplyr::select(true_rebound, detected_flag) %>%
