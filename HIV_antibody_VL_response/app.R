@@ -6,7 +6,7 @@ library(gt)
 library(scales)
 
 ui <- fluidPage(
-  titlePanel("ART Lab monitoring scenarios table"),
+  titlePanel("Monitoring scenarios table"),
   sidebarLayout(
     sidebarPanel(
       numericInput("population", "Population (N):", value = 1000, min = 1, step = 1),
@@ -16,7 +16,7 @@ ui <- fluidPage(
       width = 3
     ),
     mainPanel(
-      # h4("Styled table (static, Excel-like layout)"),
+      h4("Results table for the different monitoring strategies"),
       gt_output("table_gt"),
       br()#,
       # p("Note: calculations replicate the R code you provided. 'mean_delay_yrs' follows the same formula you supplied (AB_rebound_delay appears twice as in your snippet).")
@@ -33,7 +33,7 @@ server <- function(input, output, session) {
     AB_rebound_delay <- input$AB_rebound_delay
     annual_rebound_rate <- input$annual_rebound_rate
     
-    monitoring_scenario <- c('Annual VL', 'Annual AB', 'Biannual AB')
+    monitoring_scenario <- c('annual VL', 'Annual AB', 'biannual AB')
     N <- rep(population, length(monitoring_scenario))
     prim_VL_tests <- c(population, 0, 0)
     testing_interval <- c(1, 1, 0.5)
@@ -121,10 +121,10 @@ server <- function(input, output, session) {
       "AB_testing_per_cycle" = AB_testing,
       "Rebounds_per_year" = number_of_rebounds_PerAnnum,
       "Rebounds_per_test_round" = number_of_rebounds_Per_test_round,
-      "True_positives" = true_positives,
-      "False_positives" = false_positives,
       "VL_confirmation" = vl_confirmation,
       "Total_VL" = total_VL,
+      "True_positives" = true_positives,
+      "False_positives" = false_positives,
       "False_negatives" = false_negatives,
       "True_negatives" = true_negatives,
       "Sensitivity" = sensitivity,
@@ -183,22 +183,22 @@ server <- function(input, output, session) {
         Total_AB_per_yr = "Tot AB (per yr)",
         Mean_delay_months = "Mean delay (months)"
       ) %>%
-      # Spanners (grouped headings)
-      cols_spanner(
+      # Spanners (grouped headings) — modern gt API
+      tab_spanner(
         label = "per cycle",
-        columns = vars(N, Prim_VL_tests, Testing_interval_yrs, AB_testing_per_cycle)
+        columns = all_of(c("N", "Prim_VL_tests", "Testing_interval_yrs", "AB_testing_per_cycle"))
       ) %>%
-      cols_spanner(
+      tab_spanner(
         label = "per test round",
-        columns = vars(Rebounds_per_test_round, True_positives, False_positives, VL_confirmation, Total_VL, False_negatives, True_negatives)
+        columns = all_of(c("Rebounds_per_test_round", "True_positives", "False_positives", "VL_confirmation", "Total_VL", "False_negatives", "True_negatives"))
       ) %>%
-      cols_spanner(
+      tab_spanner(
         label = "Primary test performance",
-        columns = vars(Sensitivity, Specificity, PPV, NPV)
+        columns = all_of(c("Sensitivity", "Specificity", "PPV", "NPV"))
       ) %>%
-      cols_spanner(
+      tab_spanner(
         label = "per year",
-        columns = vars(Rebounds_per_year, Total_VL_per_yr, Total_AB_per_yr, Mean_delay_months)
+        columns = all_of(c("Rebounds_per_year", "Total_VL_per_yr", "Total_AB_per_yr", "Mean_delay_months"))
       ) %>%
       # Styling group column backgrounds
       tab_style(

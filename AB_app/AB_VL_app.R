@@ -183,22 +183,22 @@ server <- function(input, output, session) {
         Total_AB_per_yr = "Tot AB (per yr)",
         Mean_delay_months = "Mean delay (months)"
       ) %>%
-      # Spanners (grouped headings)
-      cols_spanner(
+      # Spanners (grouped headings) — modern gt API
+      tab_spanner(
         label = "per cycle",
-        columns = vars(N, Prim_VL_tests, Testing_interval_yrs, AB_testing_per_cycle)
+        columns = all_of(c("N", "Prim_VL_tests", "Testing_interval_yrs", "AB_testing_per_cycle"))
       ) %>%
-      cols_spanner(
+      tab_spanner(
         label = "per test round",
-        columns = vars(Rebounds_per_test_round, True_positives, False_positives, VL_confirmation, Total_VL, False_negatives, True_negatives)
+        columns = all_of(c("Rebounds_per_test_round", "True_positives", "False_positives", "VL_confirmation", "Total_VL", "False_negatives", "True_negatives"))
       ) %>%
-      cols_spanner(
+      tab_spanner(
         label = "Primary test performance",
-        columns = vars(Sensitivity, Specificity, PPV, NPV)
+        columns = all_of(c("Sensitivity", "Specificity", "PPV", "NPV"))
       ) %>%
-      cols_spanner(
+      tab_spanner(
         label = "per year",
-        columns = vars(Rebounds_per_year, Total_VL_per_yr, Total_AB_per_yr, Mean_delay_months)
+        columns = all_of(c("Rebounds_per_year", "Total_VL_per_yr", "Total_AB_per_yr", "Mean_delay_months"))
       ) %>%
       # Styling group column backgrounds
       tab_style(
