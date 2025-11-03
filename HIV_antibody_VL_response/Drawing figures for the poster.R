@@ -88,28 +88,73 @@ results <- param_grid %>%
 
 # --- Plot distributions ---
 
+# x <- results %>%
+#   filter(AB_Specificity == 0.95 & data_Scenario == 'Annual AB' & annual_rebound_rate == 0.06)
+
 ## 1. Distribution of Mean Delay (months)
-ggplot(results, aes(x = data_Mean_delay_months, fill = Scenario)) +
+my_labels <- c(
+  "0.9"  = "AB Specificity: 0.90",
+  "0.95" = "AB Specificity: 0.95",
+  "0.97" = "AB Specificity: 0.97"
+)
+
+p1 <- ggplot(results, aes(x = data_Mean_delay_months, fill = data_Scenario)) +
   geom_density(alpha = 0.6) +
-  facet_wrap(~ data_AB_Specificity, labeller = label_both) +
+  facet_wrap(~ data_AB_Specificity,
+             labeller = labeller(data_AB_Specificity = my_labels),
+             scales = "free_x") +
   labs(
     title = "Distribution of Mean Delay (months)",
     subtitle = "Varying AB rebound delay (0–0.4) and annual rebound rate (0.04–0.5)",
     x = "Mean Delay (months)",
-    y = "Density"
+    y = "Density",
+    fill = "Scenario"
   ) +
-  theme_minimal() +
+  theme(
+    text = element_text(size = 20),
+    plot.title = element_text(hjust = 0.5),
+    axis.line = element_line(colour = "black"),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    panel.background = element_blank(),
+    panel.border = element_blank(),
+    plot.margin = unit(c(0, 0, 0, 0), "null")
+  ) +
   scale_fill_brewer(palette = "Set2")
 
+ggsave("epidemics/plot_delay.png", plot = p1,
+       width = 10, height = 6, dpi = 300)
+
 ## 2. Distribution of Total VL (per year)
-ggplot(results, aes(x = data_Total_VL_per_year, fill = data_Scenario)) +
+my_labels <- c(
+  "0.9"  = "AB Specificity: 0.90",
+  "0.95" = "AB Specificity: 0.95",
+  "0.97" = "AB Specificity: 0.97"
+)
+
+p2 <- ggplot(results, aes(x = data_Total_VL_per_year, fill = data_Scenario)) +
   geom_density(alpha = 0.6) +
-  facet_wrap(~ AB_Specificity, labeller = label_both, scales = "free_x") +
+  facet_wrap(~ data_AB_Specificity,
+             labeller = labeller(data_AB_Specificity = my_labels),
+             scales = "free_x") +
   labs(
     title = "Distribution of Total VL (per year)",
     subtitle = "Varying AB rebound delay (0–0.4) and annual rebound rate (0.04–0.5)",
-    x = "Total VL (per year)",
-    y = "Density"
+    x = "Total Viral Loads done (per year)",
+    y = "Density",
+    fill = "Scenario"
   ) +
-  theme_minimal() +
+  theme(
+    text = element_text(size = 20),
+    plot.title = element_text(hjust = 0.5),
+    axis.line = element_line(colour = "black"),
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    panel.background = element_blank(),
+    panel.border = element_blank(),
+    plot.margin = unit(c(0, 0, 0, 0), "null")
+  ) +
   scale_fill_brewer(palette = "Set2")
+
+ggsave("epidemics/plot_totalVL_p_a.png", plot = p2,
+       width = 10, height = 6, dpi = 300)

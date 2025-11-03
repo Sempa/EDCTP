@@ -5,12 +5,12 @@ library(brolgar); library(glmmTMB); library(purrr); library(patchwork)
 library(tidyr); library(pROC); library(grid)
 
 generate_patient_params <- function(
-    n = 10000,
+    n = 1000,
     rebound_prop = 0.1,
     min_reb_wk = 0.6,
     max_reb_wk = 5,
-    slope_range_ab_rebound = c(-0.229865, 0.262241),
-    slope_range_ab_suppressed = c(-0.0725905, 0.1073314),
+    slope_range_ab_rebound = c(-4.691e-03, 5.352e-03),
+    slope_range_ab_suppressed = c(-0.001481429, 0.00219),
     intercept_ab_rebound = c(-10.3950, 5.5760),
     intercept_ab_suppressed = c(-14.5996, 20.4527)
 ) {
@@ -46,7 +46,7 @@ simulate_patient_trajectories <- function(params,
                                           detect_threshold = 1000,
                                           max_vl = 1e6,
                                           A_max_fail = 4,
-                                          A_max_suppressed = 1.5,
+                                          # A_max_suppressed = 1.5,
                                           noise_sd_ab = 0.05,
                                           seed = 123) {
   if (!is.null(seed)) set.seed(seed)
@@ -76,7 +76,9 @@ simulate_patient_trajectories <- function(params,
     ab <- numeric(length(times))
     ab[1] <- p$ab_baseline
     
-    A_max <- ifelse(p$rebound == 1, A_max_fail, A_max_suppressed)
+    # A_max <- ifelse(p$rebound == 1, A_max_fail, A_max_suppressed)
+    
+    A_max <- A_max_fail
     
     for (t_idx in 2:length(times)) {
       window_start <- max(0, times[t_idx] - p$ab_lag)

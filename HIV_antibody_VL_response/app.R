@@ -153,7 +153,7 @@ server <- function(input, output, session) {
   output$table_gt <- render_gt({
     df <- tbl_calc()
     
-    # color palette for groups
+    # Color palette for groups
     per_cycle_col <- "#E8F4FD"         # light blue
     per_test_round_col <- "#FFF4E6"    # light orange
     primary_perf_col <- "#E8FDE8"      # light green
@@ -169,10 +169,10 @@ server <- function(input, output, session) {
         AB_testing_per_cycle = "AB tests (per cycle)",
         Rebounds_per_year = "N rebounds P.A.",
         Rebounds_per_test_round = "N rebnd Per test round",
-        True_positives = "True positives",
-        False_positives = "False positives",
         VL_confirmation = "VL conf",
         Total_VL = "Tot VL",
+        True_positives = "True positives",
+        False_positives = "False positives",
         False_negatives = "False negatives",
         True_negatives = "True negatives",
         Sensitivity = "Sensitivity",
@@ -183,14 +183,14 @@ server <- function(input, output, session) {
         Total_AB_per_yr = "Tot AB (per yr)",
         Mean_delay_months = "Mean delay (months)"
       ) %>%
-      # Spanners (grouped headings) — modern gt API
+      # --- Spanners ---
       tab_spanner(
         label = "per cycle",
         columns = all_of(c("N", "Prim_VL_tests", "Testing_interval_yrs", "AB_testing_per_cycle"))
       ) %>%
       tab_spanner(
         label = "per test round",
-        columns = all_of(c("Rebounds_per_test_round", "True_positives", "False_positives", "VL_confirmation", "Total_VL", "False_negatives", "True_negatives"))
+        columns = all_of(c("True_positives", "False_positives", "False_negatives", "True_negatives"))
       ) %>%
       tab_spanner(
         label = "Primary test performance",
@@ -198,16 +198,21 @@ server <- function(input, output, session) {
       ) %>%
       tab_spanner(
         label = "per year",
-        columns = all_of(c("Rebounds_per_year", "Total_VL_per_yr", "Total_AB_per_yr", "Mean_delay_months"))
+        columns = all_of(c("Rebounds_per_year", "Total_VL_per_yr", "Total_AB_per_yr",
+                           "Rebounds_per_test_round", "VL_confirmation", "Total_VL"))
       ) %>%
-      # Styling group column backgrounds
+      tab_spanner(
+        label = "Delays (months)",
+        columns = all_of(c("Mean_delay_months"))
+      ) %>%
+      # --- Styling ---
       tab_style(
         style = list(cell_fill(color = per_cycle_col)),
         locations = cells_body(columns = c(N, Prim_VL_tests, Testing_interval_yrs, AB_testing_per_cycle))
       ) %>%
       tab_style(
         style = list(cell_fill(color = per_test_round_col)),
-        locations = cells_body(columns = c(Rebounds_per_test_round, True_positives, False_positives, VL_confirmation, Total_VL, False_negatives, True_negatives))
+        locations = cells_body(columns = c(True_positives, False_positives, False_negatives, True_negatives))
       ) %>%
       tab_style(
         style = list(cell_fill(color = primary_perf_col)),
@@ -215,17 +220,24 @@ server <- function(input, output, session) {
       ) %>%
       tab_style(
         style = list(cell_fill(color = per_year_col)),
-        locations = cells_body(columns = c(Rebounds_per_year, Total_VL_per_yr, Total_AB_per_yr, Mean_delay_months))
+        locations = cells_body(columns = c(Rebounds_per_year, Total_VL_per_yr, Total_AB_per_yr,
+                                           Rebounds_per_test_round, VL_confirmation, Total_VL))
       ) %>%
-      # Header formatting and numbers
+      tab_style(
+        style = list(cell_fill(color = per_year_col)),
+        locations = cells_body(columns = c(Mean_delay_months))
+      ) %>%
+      # --- Header & number formatting ---
       tab_header(
-        title = md("Monitoring scenarios — computed table"),
+        title = md("**Monitoring scenarios — computed table**"),
         subtitle = md("Parameters: AB Specificity, AB rebound delay, Annual rebound rate")
       ) %>%
-      fmt_number(columns = c(N, Prim_VL_tests, AB_testing_per_cycle, Rebounds_per_year, Rebounds_per_test_round,
-                             True_positives, False_positives, VL_confirmation, Total_VL, False_negatives,
-                             True_negatives, Total_VL_per_yr, Total_AB_per_yr),
-                 decimals = 1) %>%
+      fmt_number(
+        columns = c(N, Prim_VL_tests, AB_testing_per_cycle, Rebounds_per_year, Rebounds_per_test_round,
+                    True_positives, False_positives, VL_confirmation, Total_VL, False_negatives,
+                    True_negatives, Total_VL_per_yr, Total_AB_per_yr),
+        decimals = 1
+      ) %>%
       fmt_number(columns = c(Sensitivity, Specificity, PPV, NPV), decimals = 3) %>%
       fmt_number(columns = c(Mean_delay_months), decimals = 1) %>%
       tab_options(
@@ -235,6 +247,7 @@ server <- function(input, output, session) {
     
     gt_tbl
   })
+  
 }
 
 shinyApp(ui, server)

@@ -366,7 +366,7 @@ detect_ODn_upticks <- function(
   library(tidyr)
   
   sd_option <- match.arg(sd_option)
-  fixed_sd <- 1.85  # Sedia Blinded control-derived fixed SD
+  fixed_sd <- 0.3141  # Sedia Blinded control-derived fixed SD
   
   decay_data <- decay_data %>%
     arrange(individual, time) %>%

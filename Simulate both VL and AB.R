@@ -24,11 +24,11 @@ model_ab_data <- rbind(readRDS("data/model_data.rds") %>%
 summary(as.numeric((model_ab_data %>%
            filter(phase == "suppressed"))$intercept_link_log)) ##intercept among suppressed
 summary(as.numeric((model_ab_data %>%
-           filter(phase == "suppressed"))$slope_link_log) * 7) ##intercept among suppressed
+           filter(phase == "suppressed"))$slope_link_log) / 7) ##intercept among suppressed
 summary(as.numeric((model_ab_data %>%
            filter(phase == "rebound"))$intercept_link_log)) ##intercept among rebound
 summary(as.numeric((model_ab_data %>%
-           filter(phase == "rebound"))$slope_link_log) * 7) ##intercept among rebound
+           filter(phase == "rebound"))$slope_link_log) / 7) ##slope among rebound
 
 generate_patient_params <- function(n = 100000,
                                     rebound_prop = 0.10,
