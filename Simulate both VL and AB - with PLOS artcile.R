@@ -43,7 +43,7 @@ generate_patient_params <- function(
 
 simulate_patient_trajectories <- function(params,
                                           times = seq(0, 156, by = 1),  # quarterly (3 years)
-                                          detect_threshold = 1000,
+                                          detect_threshold = 10,
                                           max_vl = 1e6,
                                           A_max_fail = 4,
                                           # A_max_suppressed = 1.5,
@@ -79,7 +79,7 @@ simulate_patient_trajectories <- function(params,
     # A_max <- ifelse(p$rebound == 1, A_max_fail, A_max_suppressed)
     
     A_max <- A_max_fail
-    
+    # browser()
     for (t_idx in 2:length(times)) {
       window_start <- max(0, times[t_idx] - p$ab_lag)
       window_idx <- which(times >= window_start & times <= times[t_idx])

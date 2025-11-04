@@ -4,7 +4,7 @@ library(ggplot2)
 library(purrr)
 
 # --- Parameter grid ---
-spec_values <- c(0.90, 0.95, 0.97)
+spec_values <- seq(0.60, 0.95, 0.1)
 AB_rebound_delay_seq <- seq(0, 0.4, by = 0.01)
 annual_rebound_rate_seq <- seq(0.04, 0.5, by = 0.01)
 
@@ -84,12 +84,73 @@ results <- param_grid %>%
     list(AB_Specificity, AB_rebound_delay, annual_rebound_rate),
     ~ compute_metrics(..1, ..2, ..3, population)
   )) %>%
-  unnest(data, names_sep = "_")
+  unnest(data, names_sep = "_") %>%
+  mutate(Total_VL_saved = (population - data_Total_VL_per_year)/population) %>%
+  dplyr::select(
+    Scenario = data_Scenario, 
+    AB_Specificity, AB_rebound_delay, annual_rebound_rate, 
+    Mean_delay_months = data_Mean_delay_months, 
+    Total_VL_per_year = data_Total_VL_per_year,
+    Total_VL_saved
+  )
 
 # --- Plot distributions ---
 
-# x <- results %>%
-#   filter(AB_Specificity == 0.95 & data_Scenario == 'Annual AB' & annual_rebound_rate == 0.06)
+x <- results %>%
+  filter(Scenario == 'Annual AB')
+plotly::plot_ly(
+  data = x,
+  x = ~AB_Specificity,
+  y = ~annual_rebound_rate,
+  z = ~Total_VL_saved,
+  type = "scatter3d",      # use "surface" if grid is regular
+  mode = "markers",
+  marker = list(size = 4, color = ~Total_VL_saved, colorscale = "Viridis")
+) %>%
+  plotly::layout(
+    title = "Surface Plot of Total VL Saved for annual VL",
+    scene = list(
+      xaxis = list(title = "AB Specificity"),
+      yaxis = list(title = "Annual Rebound Rate"),
+      zaxis = list(title = "Total VL Saved")
+    )
+  )
+
+plotly::plot_ly(
+  data = x,
+  x = ~AB_Specificity,
+  y = ~annual_rebound_rate,
+  z = ~Total_VL_saved,
+  type = "scatter3d",
+  mode = "markers",
+  marker = list(size = 4, color = ~Total_VL_saved, colorscale = "Viridis")
+) %>%
+  plotly::layout(
+    title = "3D Points: Total VL Saved (Base visible at z = 0)",
+    scene = list(
+      xaxis = list(
+        title = "AB Specificity",
+        showbackground = TRUE, backgroundcolor = "rgb(245,245,245)"
+      ),
+      yaxis = list(
+        title = "Annual Rebound Rate",
+        showbackground = TRUE, backgroundcolor = "rgb(245,245,245)"
+      ),
+      zaxis = list(
+        title = "Total VL Saved",
+        # Force the floor to zero so the base plane is visible
+        range = c(0, max(x$Total_VL_saved, na.rm = TRUE)),
+        showbackground = TRUE, backgroundcolor = "rgb(235,235,235)"
+      ),
+      # Make z a bit squatter so the base is easier to see
+      aspectmode = "manual",
+      aspectratio = list(x = 1, y = 1, z = 0.6),
+      # Pull the camera back slightly so the base isn’t cropped
+      camera = list(eye = list(x = 1.6, y = 1.6, z = 0.9))
+    ),
+    # Prevent tight margins from clipping the scene
+    margin = list(l = 0, r = 0, b = 0, t = 50)
+  )
 
 ## 1. Distribution of Mean Delay (months)
 my_labels <- c(
