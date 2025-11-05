@@ -2,6 +2,7 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(purrr)
+library(plotly)
 
 # --- Parameter grid ---
 spec_values <- seq(0.60, 0.95, 0.1)
@@ -98,25 +99,8 @@ results <- param_grid %>%
 
 x <- results %>%
   filter(Scenario == 'Annual AB')
-plotly::plot_ly(
-  data = x,
-  x = ~AB_Specificity,
-  y = ~annual_rebound_rate,
-  z = ~Total_VL_saved,
-  type = "scatter3d",      # use "surface" if grid is regular
-  mode = "markers",
-  marker = list(size = 4, color = ~Total_VL_saved, colorscale = "Viridis")
-) %>%
-  plotly::layout(
-    title = "Surface Plot of Total VL Saved for annual VL",
-    scene = list(
-      xaxis = list(title = "AB Specificity"),
-      yaxis = list(title = "Annual Rebound Rate"),
-      zaxis = list(title = "Total VL Saved")
-    )
-  )
 
-plotly::plot_ly(
+p1 <- plotly::plot_ly(
   data = x,
   x = ~AB_Specificity,
   y = ~annual_rebound_rate,
@@ -125,33 +109,124 @@ plotly::plot_ly(
   mode = "markers",
   marker = list(size = 4, color = ~Total_VL_saved, colorscale = "Viridis")
 ) %>%
-  plotly::layout(
-    title = "3D Points: Total VL Saved (Base visible at z = 0)",
+  layout(
+    title = list(
+      # text = "Percentage total savings on VL testing: Annual AB testing",
+      x = 0.5,                # center title like ggplot hjust = 0.5
+      font = list(size = 22)  # title font size
+    ),
     scene = list(
       xaxis = list(
-        title = "AB Specificity",
-        showbackground = TRUE, backgroundcolor = "rgb(245,245,245)"
+        title = list(text = "AB Specificity", font = list(size = 18)),
+        tickfont = list(size = 16),
+        showbackground = FALSE,  # match panel.background = element_blank()
+        showgrid = TRUE,
+        zeroline = FALSE
       ),
       yaxis = list(
-        title = "Annual Rebound Rate",
-        showbackground = TRUE, backgroundcolor = "rgb(245,245,245)"
+        title = list(text = "Annual Rebound Rate", font = list(size = 18)),
+        tickfont = list(size = 16),
+        showbackground = FALSE,
+        showgrid = TRUE,
+        zeroline = FALSE
       ),
       zaxis = list(
-        title = "Total VL Saved",
-        # Force the floor to zero so the base plane is visible
+        title = list(text = "Total VL Saved", font = list(size = 18)),
+        tickfont = list(size = 16),
         range = c(0, max(x$Total_VL_saved, na.rm = TRUE)),
-        showbackground = TRUE, backgroundcolor = "rgb(235,235,235)"
+        showbackground = FALSE,
+        showgrid = TRUE,
+        zeroline = FALSE
       ),
-      # Make z a bit squatter so the base is easier to see
       aspectmode = "manual",
       aspectratio = list(x = 1, y = 1, z = 0.6),
-      # Pull the camera back slightly so the base isn’t cropped
       camera = list(eye = list(x = 1.6, y = 1.6, z = 0.9))
     ),
-    # Prevent tight margins from clipping the scene
-    margin = list(l = 0, r = 0, b = 0, t = 50)
+    margin = list(l = 10, r = 10, b = 10, t = 60),
+    paper_bgcolor = "white",
+    plot_bgcolor = "white",
+    font = list(family = "sans-serif", size = 18) # overall text size
+  ) %>%
+  plotly::layout(
+    # title = list(text = "3D Points: Total VL Saved", x = 0.5, font = list(size = 36)),
+    font = list(size = 20),     # base text size
+    scene = list(
+      xaxis = list(title = list(text = "AB Specificity", font = list(size = 20)), tickfont = list(size = 18)),
+      yaxis = list(title = list(text = "Annual Rebound Rate", font = list(size = 20)), tickfont = list(size = 18)),
+      zaxis = list(title = list(text = "Total VL Saved", font = list(size = 20)), tickfont = list(size = 18))
+    )
   )
+p1
+# plotly::save_image(p1, "annual AB.png", width = 1600, height = 1200, scale = 2)
+htmlwidgets::saveWidget(p1, "biannual_AB.html", selfcontained = TRUE)
+webshot2::webshot("biannual_AB.html", "biannual_AB.png", 
+                  vwidth = 1800, vheight = 1400, zoom = 2)
+x <- results %>%
+  filter(Scenario == 'biannual AB')
 
+p2 <- plotly::plot_ly(
+  data = x,
+  x = ~AB_Specificity,
+  y = ~annual_rebound_rate,
+  z = ~Total_VL_saved,
+  type = "scatter3d",
+  mode = "markers",
+  marker = list(size = 4, color = ~Total_VL_saved, colorscale = "Viridis")
+) %>%
+  layout(
+    title = list(
+      # text = "Percentage total savings on VL testing: Biannual AB testing",
+      x = 0.5,                # center title like ggplot hjust = 0.5
+      font = list(size = 22)  # title font size
+    ),
+    scene = list(
+      xaxis = list(
+        title = list(text = "AB Specificity", font = list(size = 18)),
+        tickfont = list(size = 18),
+        showbackground = FALSE,  # match panel.background = element_blank()
+        showgrid = TRUE,
+        zeroline = FALSE
+      ),
+      yaxis = list(
+        title = list(text = "Annual Rebound Rate", font = list(size = 18)),
+        tickfont = list(size = 18),
+        showbackground = FALSE,
+        showgrid = TRUE,
+        zeroline = FALSE
+      ),
+      zaxis = list(
+        title = list(text = "Total VL Saved", font = list(size = 18)),
+        tickfont = list(size = 18),
+        tickvals = c(0, 0.2, 0.4, 0.6, 0.8, 1),
+        ticktext = c("0", "0.2", "0.4", "0.6", "0.8", "1.0"),
+        range = c(0, max(x$Total_VL_saved, na.rm = TRUE)),
+        showbackground = FALSE,
+        showgrid = TRUE,
+        zeroline = FALSE
+      ),
+      aspectmode = "manual",
+      aspectratio = list(x = 1, y = 1, z = 0.6),
+      camera = list(eye = list(x = 1.6, y = 1.6, z = 0.9))
+    ),
+    margin = list(l = 10, r = 10, b = 10, t = 60),
+    paper_bgcolor = "white",
+    plot_bgcolor = "white",
+    font = list(family = "sans-serif", size = 20) # overall text size
+  ) %>%
+  plotly::layout(
+    # title = list(text = "3D Points: Total VL Saved", x = 0.5, font = list(size = 36)),
+    font = list(size = 20),     # base text size
+    scene = list(
+      xaxis = list(title = list(text = "AB Specificity", font = list(size = 20)), tickfont = list(size = 18)),
+      yaxis = list(title = list(text = "Annual Rebound Rate", font = list(size = 20)), tickfont = list(size = 18)),
+      zaxis = list(title = list(text = "Total VL Saved", font = list(size = 20)), tickfont = list(size = 18))
+    )
+  )
+p2
+# plotly::save_image(p2, "biannual AB.png", width = 1600, height = 1200, scale = 2)
+htmlwidgets::saveWidget(p2, "biannual_AB.html", selfcontained = TRUE)
+webshot2::webshot("biannual_AB.html", "biannual_AB.png", 
+                  vwidth = 1800, vheight = 1400, zoom = 2)
 ## 1. Distribution of Mean Delay (months)
 my_labels <- c(
   "0.9"  = "AB Specificity: 0.90",
