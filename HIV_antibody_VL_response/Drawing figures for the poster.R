@@ -158,9 +158,9 @@ p1 <- plotly::plot_ly(
   )
 p1
 # plotly::save_image(p1, "annual AB.png", width = 1600, height = 1200, scale = 2)
-htmlwidgets::saveWidget(p1, "biannual_AB.html", selfcontained = TRUE)
-webshot2::webshot("biannual_AB.html", "biannual_AB.png", 
-                  vwidth = 1800, vheight = 1400, zoom = 2)
+# htmlwidgets::saveWidget(p1, "biannual_AB.html", selfcontained = TRUE)
+# webshot2::webshot("biannual_AB.html", "biannual_AB.png", 
+#                   vwidth = 1800, vheight = 1400, zoom = 2)
 x <- results %>%
   filter(Scenario == 'biannual AB')
 
@@ -228,69 +228,56 @@ htmlwidgets::saveWidget(p2, "biannual_AB.html", selfcontained = TRUE)
 webshot2::webshot("biannual_AB.html", "biannual_AB.png", 
                   vwidth = 1800, vheight = 1400, zoom = 2)
 ## 1. Distribution of Mean Delay (months)
-my_labels <- c(
-  "0.9"  = "AB Specificity: 0.90",
-  "0.95" = "AB Specificity: 0.95",
-  "0.97" = "AB Specificity: 0.97"
-)
-
-p1 <- ggplot(results, aes(x = data_Mean_delay_months, fill = data_Scenario)) +
-  geom_density(alpha = 0.6) +
-  facet_wrap(~ data_AB_Specificity,
-             labeller = labeller(data_AB_Specificity = my_labels),
-             scales = "free_x") +
+p3 <- ggplot(results %>%
+               filter(Scenario == 'Annual AB' & AB_Specificity == 0.6 & annual_rebound_rate == 0.04), 
+             aes(y = AB_rebound_delay, x = Mean_delay_months)) + #, fill = Scenario
+  geom_point(alpha = 0.6, size = 5) +
   labs(
-    title = "Distribution of Mean Delay (months)",
-    subtitle = "Varying AB rebound delay (0–0.4) and annual rebound rate (0.04–0.5)",
+    # title = "Distribution of Mean Delay (months)",
+    # subtitle = "Varying AB rebound delay (0–0.4) and annual rebound rate (0.04–0.5)",
     x = "Mean Delay (months)",
-    y = "Density",
-    fill = "Scenario"
+    y = "AB rebound delay"#,
+    # fill = "Scenario"
   ) +
   theme(
-    text = element_text(size = 20),
+    text = element_text(size = 22),
     plot.title = element_text(hjust = 0.5),
     axis.line = element_line(colour = "black"),
-    axis.text = element_text(size = 18),
-    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 20),
+    axis.title = element_text(size = 20),
     panel.background = element_blank(),
     panel.border = element_blank(),
     plot.margin = unit(c(0, 0, 0, 0), "null")
   ) +
   scale_fill_brewer(palette = "Set2")
 
-ggsave("epidemics/plot_delay.png", plot = p1,
+ggsave("epidemics/plot_delay.png", plot = p3,
        width = 10, height = 6, dpi = 300)
 
 ## 2. Distribution of Total VL (per year)
-my_labels <- c(
-  "0.9"  = "AB Specificity: 0.90",
-  "0.95" = "AB Specificity: 0.95",
-  "0.97" = "AB Specificity: 0.97"
-)
 
-p2 <- ggplot(results, aes(x = data_Total_VL_per_year, fill = data_Scenario)) +
-  geom_density(alpha = 0.6) +
-  facet_wrap(~ data_AB_Specificity,
-             labeller = labeller(data_AB_Specificity = my_labels),
-             scales = "free_x") +
+p4 <- ggplot(results %>%
+               filter(Scenario == 'biannual AB' & AB_Specificity == 0.6 & annual_rebound_rate == 0.04), 
+             aes(y = AB_rebound_delay, x = Mean_delay_months)) + #, fill = Scenario
+  geom_point(alpha = 0.6, size = 5) +
   labs(
-    title = "Distribution of Total VL (per year)",
-    subtitle = "Varying AB rebound delay (0–0.4) and annual rebound rate (0.04–0.5)",
-    x = "Total Viral Loads done (per year)",
-    y = "Density",
-    fill = "Scenario"
+    # title = "Distribution of Mean Delay (months)",
+    # subtitle = "Varying AB rebound delay (0–0.4) and annual rebound rate (0.04–0.5)",
+    x = "Mean Delay (months)",
+    y = "AB rebound delay"#,
+    # fill = "Scenario"
   ) +
   theme(
-    text = element_text(size = 20),
+    text = element_text(size = 22),
     plot.title = element_text(hjust = 0.5),
     axis.line = element_line(colour = "black"),
-    axis.text = element_text(size = 18),
-    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 20),
+    axis.title = element_text(size = 20),
     panel.background = element_blank(),
     panel.border = element_blank(),
     plot.margin = unit(c(0, 0, 0, 0), "null")
   ) +
   scale_fill_brewer(palette = "Set2")
 
-ggsave("epidemics/plot_totalVL_p_a.png", plot = p2,
+ggsave("epidemics/plot_totalVL_p_a.png", plot = p4,
        width = 10, height = 6, dpi = 300)
