@@ -230,7 +230,7 @@ webshot2::webshot("biannual_AB.html", "biannual_AB.png",
 ## 1. Distribution of Mean Delay (months)
 p3 <- ggplot(results %>%
                filter(Scenario == 'Annual AB' & AB_Specificity == 0.6 & annual_rebound_rate == 0.04), 
-             aes(y = AB_rebound_delay, x = Mean_delay_months)) + #, fill = Scenario
+             aes(y = Mean_delay_months, x = AB_rebound_delay)) + #, fill = Scenario
   geom_point(alpha = 0.6, size = 5) +
   labs(
     # title = "Distribution of Mean Delay (months)",
@@ -258,7 +258,7 @@ ggsave("epidemics/plot_delay.png", plot = p3,
 
 p4 <- ggplot(results %>%
                filter(Scenario == 'biannual AB' & AB_Specificity == 0.6 & annual_rebound_rate == 0.04), 
-             aes(y = AB_rebound_delay, x = Mean_delay_months)) + #, fill = Scenario
+             aes(y = Mean_delay_months, x = AB_rebound_delay)) + #, fill = Scenario
   geom_point(alpha = 0.6, size = 5) +
   labs(
     # title = "Distribution of Mean Delay (months)",
