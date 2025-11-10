@@ -235,8 +235,8 @@ p3 <- ggplot(results %>%
   labs(
     # title = "Distribution of Mean Delay (months)",
     # subtitle = "Varying AB rebound delay (0–0.4) and annual rebound rate (0.04–0.5)",
-    x = "Mean Delay (months)",
-    y = "AB rebound delay"#,
+    x = "AB rebound delay",
+    y = "Mean Delay (months)"#,
     # fill = "Scenario"
   ) +
   theme(
@@ -251,7 +251,7 @@ p3 <- ggplot(results %>%
   ) +
   scale_fill_brewer(palette = "Set2")
 
-ggsave("epidemics/plot_delay.png", plot = p3,
+ggsave("epidemics/mean_delay_annual_AB.png", plot = p3,
        width = 10, height = 6, dpi = 300)
 
 ## 2. Distribution of Total VL (per year)
@@ -263,8 +263,8 @@ p4 <- ggplot(results %>%
   labs(
     # title = "Distribution of Mean Delay (months)",
     # subtitle = "Varying AB rebound delay (0–0.4) and annual rebound rate (0.04–0.5)",
-    x = "Mean Delay (months)",
-    y = "AB rebound delay"#,
+    x = "AB rebound delay",
+    y = "Mean Delay (months)"#,
     # fill = "Scenario"
   ) +
   theme(
@@ -279,5 +279,5 @@ p4 <- ggplot(results %>%
   ) +
   scale_fill_brewer(palette = "Set2")
 
-ggsave("epidemics/plot_totalVL_p_a.png", plot = p4,
+ggsave("epidemics/mean_delay_biannual_AB.png", plot = p4,
        width = 10, height = 6, dpi = 300)
