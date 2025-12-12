@@ -1,0 +1,13 @@
+"annual_non_suppression","WTP","best_freq","best_NMB","any_CE"
+0.02,200,"annual",34.815,TRUE
+0.02,500,"annual",34.155,TRUE
+0.02,800,"annual",33.495,TRUE
+0.05,200,"annual",33.4125,TRUE
+0.05,500,"annual",31.7625,TRUE
+0.05,800,"annual",30.1125,TRUE
+0.1,200,"annual",31.075,TRUE
+0.1,500,"annual",27.775,TRUE
+0.1,800,"annual",24.475,TRUE
+0.2,200,"annual",26.4,TRUE
+0.2,500,"annual",19.8,TRUE
+0.2,800,"annual",13.2,TRUE
