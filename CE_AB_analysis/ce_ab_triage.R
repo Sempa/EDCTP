@@ -142,6 +142,12 @@ calc_per_person <- function(frequency_yrs = 1,
   )
 }
 
+##Specifying the frequencies that should be outputed
+freq_scenarios <- tibble(
+  frequency_yrs = c(1, 0.5, 0.25, 0.125),
+  freq_label = c("Annual", "Biannual", "Quarterly", "6-weekly")
+)
+
 # Test function with some frequencies
 calc_per_person(1, params)
 calc_per_person(0.5, params)
@@ -231,62 +237,66 @@ tornado_inputs <- tibble(
   param = c("ab_sensitivity","ab_specificity","cost_ab","cost_pcr","mean_gain","prop_res","p_resup_res","p_resup_beh","annual_non_suppression"),
   base  = c(params$ab_sensitivity, params$ab_specificity, params$cost_ab, params$cost_pcr, params$mean_effect_years_gain_on_detection, params$prop_reistance, params$p_resupp_after_resistance_detect, params$p_resupp_after_behav_detect, params$annual_non_suppression),
   low   = c(0.3, 0.85, 1.0, 20, 0.05, 0.1, 0.05, 0.2, 0.01),
-  high  = c(0.9, 0.99, 5.0, 100, 0.5, 0.7, 0.5, 0.95, 0.30)
+  high  = c(0.9, 0.99, 7.0, 100, 0.5, 0.7, 0.5, 0.95, 0.30)
 )
 
 # pick a scenario to test (e.g., biannual)
-base_freq <- 0.5
-tornado_out <- tornado_inputs %>%
+# base_freq <- 0.5
+tornado_all <- freq_scenarios %>%
   rowwise() %>%
   mutate(
-    out_low = list({
-      pmod <- params
-      pmod[[param]] <- low
-      calc_per_person(frequency_yrs = base_freq, params_list = pmod)
-    }),
-    out_high = list({
-      pmod <- params
-      pmod[[param]] <- high
-      calc_per_person(frequency_yrs = base_freq, params_list = pmod)
+    tornado = list({
+      base_freq <- frequency_yrs
+      
+      tornado_out <- tornado_inputs %>%
+        rowwise() %>%
+        mutate(
+          out_low = list({
+            pmod <- params
+            pmod[[param]] <- low
+            calc_per_person(base_freq, pmod)
+          }),
+          out_high = list({
+            pmod <- params
+            pmod[[param]] <- high
+            calc_per_person(base_freq, pmod)
+          })
+        ) %>%
+        unnest(cols = c(out_low, out_high), names_sep = "_") %>%
+        mutate(
+          NMB_low  = 500 * (out_low_eff_triage  - out_low_eff_pcronly) -
+            (out_low_cost_triage     - out_low_cost_pcronly),
+          NMB_high = 500 * (out_high_eff_triage - out_high_eff_pcronly) -
+            (out_high_cost_triage    - out_high_cost_pcronly),
+          NMB_base = {
+            base <- calc_per_person(base_freq, params)
+            500 * base$delta_eff - base$delta_cost
+          },
+          min_change = pmin(NMB_low - NMB_base, NMB_high - NMB_base),
+          max_change = pmax(NMB_low - NMB_base, NMB_high - NMB_base)#,
+          # freq_label = freq_label
+        )
+      
+      tornado_out
     })
   ) %>%
-  unnest(cols = c(out_low,out_high), names_sep = "_") %>%
-  # We'll compute NMB at WTP=500 as example or use multiple WTPs if desired
-  mutate(
-    NMB_low  = 500 * (out_low_eff_triage  - out_low_eff_pcronly)  -
-      (out_low_cost_triage      - out_low_cost_pcronly),
-    
-    NMB_high = 500 * (out_high_eff_triage - out_high_eff_pcronly) -
-      (out_high_cost_triage      - out_high_cost_pcronly),
-    
-    NMB_base = {
-      base <- calc_per_person(base_freq, params)
-      500 * base$delta_eff - base$delta_cost
-    },
-    
-    change_low  = NMB_low  - NMB_base,
-    change_high = NMB_high - NMB_base
-  ) %>%
-  dplyr::select(param, low, high, NMB_base, NMB_low, NMB_high, change_low, change_high)
+  unnest(tornado)
 
-# Make tornado data frame (absolute changes)
-tornado_df <- tornado_out %>%
-  mutate(
-    min_change = pmin(change_low, change_high),
-    max_change = pmax(change_low, change_high)
-  ) %>%
-  arrange(desc(abs(min_change) + abs(max_change))) %>%
-  mutate(param = factor(param, levels = param))
-
-# Plot tornado
-tornado_plot <- ggplot(tornado_df) +
-  geom_linerange(aes(x = param, ymin = min_change, ymax = max_change), size = 6) +
-  geom_point(aes(x = param, y = NMB_base), color = "black", size = 2) +
+tornado_plot_all <- ggplot(tornado_all) +
+  geom_linerange(
+    aes(x = param, ymin = min_change, ymax = max_change),
+    size = 5
+  ) +
   coord_flip() +
-  labs(x = "", y = "Change in NMB (WTP=500 USD)", title = "Tornado plot — one-way sensitivity (biannual)") +
+  facet_wrap(~ freq_label, scales = "free_x") +
+  labs(
+    x = "",
+    y = "Change in NMB (USD, WTP = 500)",
+    title = "One-way sensitivity analysis across monitoring frequencies"
+  ) +
   theme_minimal()
 
-print(tornado_plot)
+print(tornado_plot_all)
 
 # ---------------------------------
 # 6) Probabilistic Sensitivity Analysis (PSA)
@@ -308,57 +318,76 @@ draws <- tibble(
 )
 
 # Run PSA for two policies at a chosen frequency (e.g., biannual)
-psa_freq <- 0.5
-psa_results <- draws %>%
-  mutate(sim = row_number()) %>%
+# psa_freq <- 0.5
+psa_all <- freq_scenarios %>%
   rowwise() %>%
   mutate(
-    out = list(calc_per_person(
-      frequency_yrs = psa_freq,
-      params_list = params,
-      annual_non_suppression = annual_non_suppression,
-      ab_sens = ab_sensitivity,
-      ab_spec = ab_specificity,
-      cost_ab = cost_ab,
-      cost_pcr = cost_pcr,
-      mean_gain = mean_gain,
-      prop_res = prop_res,
-      p_resup_res = p_resup_res,
-      p_resup_beh = p_resup_beh
-    ))
+    psa = list({
+      psa_freq <- frequency_yrs
+      
+      draws %>%
+        mutate(sim = row_number()) %>%
+        rowwise() %>%
+        mutate(
+          out = list(calc_per_person(
+            frequency_yrs = psa_freq,
+            params_list = params,
+            annual_non_suppression = annual_non_suppression,
+            ab_sens = ab_sensitivity,
+            ab_spec = ab_specificity,
+            cost_ab = cost_ab,
+            cost_pcr = cost_pcr,
+            mean_gain = mean_gain,
+            prop_res = prop_res,
+            p_resup_res = p_resup_res,
+            p_resup_beh = p_resup_beh
+          ))
+        ) %>%
+        unnest(out) %>%
+        transmute(
+          delta_cost,
+          delta_eff#,
+          # freq_label = freq_label
+        )
+    })
   ) %>%
-  unnest(out) %>%
-  ungroup()
+  unnest(psa)
 
-# Compute incremental costs/effects vs PCR-only
-psa_delta <- psa_results %>%
-  transmute(sim, delta_cost, delta_eff)
-
-# CE plane
-ce_plane <- ggplot(psa_delta, aes(x = delta_eff, y = delta_cost)) +
-  geom_point(alpha = 0.3, size = 0.8) +
+ce_plane_all <- ggplot(psa_all, aes(x = delta_eff, y = delta_cost)) +
+  geom_point(alpha = 0.25, size = 0.7) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = 0, linetype = "dashed") +
-  labs(x = "Δ Effect (years of suppression)", y = "Δ Cost (USD)", title = paste0("CE plane (biannual AB triage vs PCR-only)")) +
+  facet_wrap(~ freq_label) +
+  labs(
+    x = "Δ Effect (years of viral suppression)",
+    y = "Δ Cost (USD)",
+    title = "Cost-effectiveness planes by monitoring frequency"
+  ) +
   theme_minimal()
 
-print(ce_plane)
+print(ce_plane_all)
 
 # CEAC: proportion of sims where NMB > 0 across WTPs
-wtp_range <- seq(0, 1000, by = 10)
-ceac_df <- expand.grid(sim = psa_delta$sim, WTP = wtp_range) %>%
-  as_tibble() %>%
-  left_join(psa_delta, by = "sim") %>%
+ceac_all <- psa_all %>%
+  crossing(WTP = seq(0, 1000, by = 20)) %>%
   mutate(NMB = WTP * delta_eff - delta_cost) %>%
-  group_by(WTP) %>%
-  summarize(pr_CE = mean(NMB > 0), .groups = "drop")
+  group_by(freq_label, WTP) %>%
+  summarize(
+    pr_CE = mean(NMB > 0),
+    .groups = "drop"
+  )
 
-ceac_plot <- ggplot(ceac_df, aes(x = WTP, y = pr_CE)) +
-  geom_line() +
-  labs(x = "Willingness-to-pay (USD per year of suppression)", y = "Probability AB triage is cost-effective", title = "CEAC (biannual)") +
+ceac_plot_all <- ggplot(ceac_all, aes(x = WTP, y = pr_CE)) +
+  geom_line(size = 1) +
+  facet_wrap(~ freq_label) +
+  labs(
+    x = "Willingness-to-pay (USD per year of suppression)",
+    y = "Probability cost-effective",
+    title = "CEACs by monitoring frequency"
+  ) +
   theme_minimal()
 
-print(ceac_plot)
+print(ceac_plot_all)
 
 # ---------------------------------
 # 7) Outputs: Figures and summary tables
@@ -368,8 +397,9 @@ write.csv(results, "CE_AB_analysis/ab_triage_results_sweep.csv", row.names = FAL
 write.csv(ce_summary, "CE_AB_analysis/ab_triage_ce_summary.csv", row.names = FALSE)
 
 # Save example plots
-ggsave("CE_AB_analysis/tornado_plot.png", tornado_plot, width = 8, height = 6)
-ggsave("CE_AB_analysis/ce_plane.png", ce_plane, width = 7, height = 5)
-ggsave("CE_AB_analysis/ceac_plot.png", ceac_plot, width = 7, height = 5)
+ggsave("CE_AB_analysis/tornado_all_frequencies.png", tornado_plot_all, width = 12, height = 8)
+ggsave("CE_AB_analysis/ce_plane_all_frequencies.png", ce_plane_all, width = 12, height = 8)
+ggsave("CE_AB_analysis/ceac_all_frequencies.png", ceac_plot_all, width = 12, height = 8)
+
 
 message("Completed. Results saved to CSV and plots saved. Adjust parameters in 'params' and rerun as needed.")
