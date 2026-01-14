@@ -181,6 +181,11 @@ results <- results %>%
       abs(frequency_yrs - 1/12) < 1e-6 ~ "monthly",
       TRUE ~ paste0(round(1/frequency_yrs,1),"x/yr")
     ),
+    freq_label = str_trim(freq_label),
+    freq_label = factor(
+      freq_label,
+      levels = c("6-weekly", "Quarterly", "Biannual", "Annual")
+    ),
     triage_cheaper = cost_triage < cost_pcronly,
     triage_more_effective = eff_triage > eff_pcronly
   )
@@ -288,7 +293,17 @@ tornado_plot_all <- ggplot(tornado_all) +
     size = 5
   ) +
   coord_flip() +
-  facet_wrap(~ freq_label, scales = "free_x") +
+  # facet_wrap(~ freq_label, scales = "free_x") +
+  facet_wrap(
+    ~ forcats::fct_relevel(
+      freq_label,
+      "6-weekly",
+      "Quarterly",
+      "Biannual",
+      "Annual"
+    ),
+    scales = "free_x"
+  ) +
   labs(
     x = "",
     y = "Change in NMB (USD, WTP = 500)",
@@ -357,7 +372,17 @@ ce_plane_all <- ggplot(psa_all, aes(x = delta_eff, y = delta_cost)) +
   geom_point(alpha = 0.25, size = 0.7) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = 0, linetype = "dashed") +
-  facet_wrap(~ freq_label) +
+  # facet_wrap(~ freq_label) 
+  facet_wrap(
+    ~ forcats::fct_relevel(
+      freq_label,
+      "6-weekly",
+      "Quarterly",
+      "Biannual",
+      "Annual"
+    ),
+    scales = "free_x"
+  ) +
   labs(
     x = "Δ Effect (years of viral suppression)",
     y = "Δ Cost (USD)",
@@ -379,7 +404,17 @@ ceac_all <- psa_all %>%
 
 ceac_plot_all <- ggplot(ceac_all, aes(x = WTP, y = pr_CE)) +
   geom_line(size = 1) +
-  facet_wrap(~ freq_label) +
+  # facet_wrap(~ freq_label)
+  facet_wrap(
+    ~ forcats::fct_relevel(
+      freq_label,
+      "6-weekly",
+      "Quarterly",
+      "Biannual",
+      "Annual"
+    ),
+    scales = "free_x"
+  )+
   labs(
     x = "Willingness-to-pay (USD per year of suppression)",
     y = "Probability cost-effective",
