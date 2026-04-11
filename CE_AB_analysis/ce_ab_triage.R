@@ -44,7 +44,14 @@ params <- list(
   p_resupp_after_behav_detect = 0.6,       # probability of re-suppression if behavioural non-adherence detected
   # multiplier for earlier detection efficacy:
   efficacy_multiplier_resistance = 0.6,    # detection less effective for resistance (lower chance to re-suppress)
-  efficacy_multiplier_behav = 1.0          # detection more effective for behaviour
+  efficacy_multiplier_behav = 1.0,          # detection more effective for behaviour
+  # Mortality among suppressed and none suppressed
+  mort_rate_suppressed = 0.015,
+  mort_rate_unsuppressed = 0.06,
+  # DALY parameters
+  life_expectancy_remaining = 30,   # average remaining life-years at cohort age
+  dw_suppressed = 0.05,             # disability weight (stable HIV on ART)
+  dw_unsuppressed = 0.20            # disability weight (unsuppressed HIV)
 )
 
 # Example WTP thresholds (user originally requested $200, $500, $800)
@@ -70,8 +77,16 @@ calc_per_person <- function(frequency_yrs = 1,
                             p_resup_res = params_list$p_resupp_after_resistance_detect,
                             p_resup_beh = params_list$p_resupp_after_behav_detect,
                             eff_mult_res = params_list$efficacy_multiplier_resistance,
-                            eff_mult_beh = params_list$efficacy_multiplier_behav
-) {
+                            eff_mult_beh = params_list$efficacy_multiplier_behav,
+                            mort_rate_suppressed = params_list$mort_rate_suppressed,
+                            mort_rate_unsuppressed = params_list$mort_rate_unsuppressed,
+                            life_expectancy_remaining = params_list$life_expectancy_remaining,
+                            dw_suppressed = params_list$dw_suppressed,
+                            dw_unsuppressed = params_list$dw_unsuppressed
+) { #browser()
+  # Mortality
+  p_death_suppressed <- 1 - exp(-mort_rate_suppressed)
+  p_death_unsuppressed <- 1 - exp(-mort_rate_unsuppressed)
   
   # expected number of Ab tests per year
   ab_tests_per_year <- ifelse(is.infinite(frequency_yrs) || frequency_yrs <= 0, 0, 1 / frequency_yrs)
@@ -91,6 +106,9 @@ calc_per_person <- function(frequency_yrs = 1,
   # we treat the gain as mean_gain * probability of resuppression on detection (weighted)
   p_resupp_weighted <- prop_res * p_resup_res + (1 - prop_res) * p_resup_beh
   eff_pcronly <- annual_non_suppression * p_resupp_weighted * mean_gain  # years-of-suppression gained per person-year
+  # baseline mortality (PCR only)
+  mort_pcronly <- annual_non_suppression * p_death_unsuppressed +
+    (1 - annual_non_suppression) * p_death_suppressed
   
   # AB_triage:
   # If Ab test positive -> confirm with PCR (assume PCR applied only to positives)
@@ -126,19 +144,52 @@ calc_per_person <- function(frequency_yrs = 1,
     (1 - prop_res) * p_resup_beh * eff_mult_beh
   
   eff_triage <- annual_non_suppression * frac_caught_earlier * p_resupp_weighted_earlier * delta_delay
+  # triage reduces unsuppressed time
+  mort_triage <- mort_pcronly - eff_triage * 
+    (p_death_unsuppressed - p_death_suppressed)
   
+  #Years of Life Lost (YLL)
+  YLL_pcronly <- mort_pcronly * life_expectancy_remaining
+  YLL_triage  <- mort_triage  * life_expectancy_remaining
+  
+  YLD_pcronly <- (1 - annual_non_suppression) * dw_suppressed +
+    annual_non_suppression * dw_unsuppressed
+  
+  unsuppressed_triage <- annual_non_suppression - eff_triage
+  
+  YLD_triage <- (1 - unsuppressed_triage) * dw_suppressed +
+    unsuppressed_triage * dw_unsuppressed
+  
+  DALY_pcronly <- YLL_pcronly + YLD_pcronly
+  DALY_triage  <- YLL_triage  + YLD_triage
+  
+  delta_DALY <- DALY_pcronly - DALY_triage   # DALYs averted
+  # return per-person-year costs and effects
   # return per-person-year costs and effects
   tibble(
     ab_tests_per_year = ab_tests_per_year,
     pcr_tests_per_year_pcronly = pcr_tests_per_year_pcronly,
     pcr_tests_per_year_triage = pcr_confirm_per_year_triage,
+    
     cost_pcronly = cost_pcronly,
     cost_triage = cost_triage,
+    
     eff_pcronly = eff_pcronly,
     eff_triage = eff_triage,
+    
+    mort_pcronly = mort_pcronly,
+    mort_triage = mort_triage,
+    
+    # Core incremental outcomes
     delta_cost = cost_triage - cost_pcronly,
-    delta_eff = eff_triage - eff_pcronly,
-    ICER = ifelse(delta_eff == 0, NA, delta_cost / delta_eff)
+    delta_eff = eff_triage - eff_pcronly,          # suppression-years
+    delta_LY = mort_pcronly - mort_triage,         # life-years gained
+    delta_DALY = delta_DALY,                       # DALYs averted
+    
+    # ICERs
+    ICER_suppression = ifelse(delta_eff == 0, NA, delta_cost / delta_eff),
+    ICER_LY = ifelse(delta_LY == 0, NA, delta_cost / delta_LY),
+    ICER_DALY = ifelse(delta_DALY == 0, NA, delta_cost / delta_DALY)
   )
 }
 
@@ -174,17 +225,16 @@ results <- grid %>%
 results <- results %>%
   mutate(
     freq_label = case_when(
-      frequency_yrs == 1 ~ "annual",
-      frequency_yrs == 0.5 ~ "biannual",
-      frequency_yrs == 0.25 ~ "quarterly",
-      frequency_yrs == 0.125 ~ "6-week",
-      abs(frequency_yrs - 1/12) < 1e-6 ~ "monthly",
+      frequency_yrs == 1 ~ "Annual",
+      frequency_yrs == 0.5 ~ "Biannual",
+      frequency_yrs == 0.25 ~ "Quarterly",
+      frequency_yrs == 0.125 ~ "6-weekly",
+      abs(frequency_yrs - 1/12) < 1e-6 ~ "Monthly",
       TRUE ~ paste0(round(1/frequency_yrs,1),"x/yr")
     ),
-    freq_label = str_trim(freq_label),
     freq_label = factor(
       freq_label,
-      levels = c("6-weekly", "Quarterly", "Biannual", "Annual")
+      levels = c("6-weekly", "Quarterly", "Biannual", "Annual", "Monthly")
     ),
     triage_cheaper = cost_triage < cost_pcronly,
     triage_more_effective = eff_triage > eff_pcronly
@@ -192,7 +242,9 @@ results <- results %>%
 
 # Print results table
 print(results %>% 
-        dplyr::select(annual_non_suppression, freq_label, cost_pcronly, cost_triage, delta_cost, eff_pcronly, eff_triage, delta_eff, ICER, triage_cheaper, triage_more_effective))
+        dplyr::select(annual_non_suppression, freq_label, cost_pcronly, 
+                      cost_triage, delta_cost, eff_pcronly, eff_triage, delta_eff, 
+                      ICER_suppression, ICER_LY, ICER_DALY, triage_cheaper, triage_more_effective))
 
 # Answer to Q2: at what frequency cost of testing becomes lower than PCR-only?
 # For each prevalence, find most frequent (largest ab_tests_per_year) that still has triage_cheaper == TRUE
@@ -213,7 +265,7 @@ ce_results <- results %>%
   rowwise() %>%
   mutate(
     NMB_200 = WTPs[1] * delta_eff - delta_cost,
-    NMB_500 = WTPs[2] * delta_eff - delta_cost,
+    NMB_500 = 500 * delta_DALY - delta_cost,
     NMB_800 = WTPs[3] * delta_eff - delta_cost
   ) %>%
   ungroup()
@@ -226,7 +278,7 @@ ce_summary <- ce_results %>%
                          WTP_label == "NMB_800" ~ 800)) %>%
   group_by(annual_non_suppression, WTP) %>%
   summarize(
-    best_freq = freq_label[which.max(NMB)],
+    best_freq = freq_label[which.max(NMB)][1],
     best_NMB = max(NMB),
     any_CE = any(NMB > 0),
     .groups = "drop"
@@ -239,10 +291,46 @@ print(ce_summary)
 # ---------------------------------
 # Define base and ranges for key inputs (examples)
 tornado_inputs <- tibble(
-  param = c("ab_sensitivity","ab_specificity","cost_ab","cost_pcr","mean_gain","prop_res","p_resup_res","p_resup_beh","annual_non_suppression"),
-  base  = c(params$ab_sensitivity, params$ab_specificity, params$cost_ab, params$cost_pcr, params$mean_effect_years_gain_on_detection, params$prop_reistance, params$p_resupp_after_resistance_detect, params$p_resupp_after_behav_detect, params$annual_non_suppression),
-  low   = c(0.3, 0.85, 1.0, 20, 0.05, 0.1, 0.05, 0.2, 0.01),
-  high  = c(0.9, 0.99, 7.0, 100, 0.5, 0.7, 0.5, 0.95, 0.30)
+  param = c(
+    "ab_sensitivity","ab_specificity",
+    "cost_ab","cost_pcr",
+    "mean_gain","prop_res",
+    "p_resup_res","p_resup_beh",
+    "annual_non_suppression",
+    "mort_rate_suppressed",
+    "mort_rate_unsuppressed"
+  ),
+  base  = c(
+    params$ab_sensitivity,
+    params$ab_specificity,
+    params$cost_ab,
+    params$cost_pcr,
+    params$mean_effect_years_gain_on_detection,
+    params$prop_reistance,
+    params$p_resupp_after_resistance_detect,
+    params$p_resupp_after_behav_detect,
+    params$annual_non_suppression,
+    params$mort_rate_suppressed,
+    params$mort_rate_unsuppressed
+  ),
+  low   = c(
+    0.3, 0.85,
+    1.0, 20,
+    0.05, 0.1,
+    0.05, 0.2,
+    0.01,
+    0.005,   # suppressed mortality lower bound
+    0.03     # unsuppressed lower bound
+  ),
+  high  = c(
+    0.9, 0.99,
+    7.0, 100,
+    0.5, 0.7,
+    0.5, 0.95,
+    0.30,
+    0.03,    # suppressed upper bound
+    0.10     # unsuppressed upper bound
+  )
 )
 
 # pick a scenario to test (e.g., biannual)
@@ -321,15 +409,25 @@ n_sims <- 5000
 
 # helper to draw
 draws <- tibble(
-  ab_sensitivity = rbeta(n_sims, 60, 40),       # mean ~0.6 (alpha/beta tuned)
-  ab_specificity = rbeta(n_sims, 95, 5),        # mean ~0.95
-  cost_ab = rgamma(n_sims, shape = 4, scale = 0.6), # mean ~2.4
-  cost_pcr = rgamma(n_sims, shape = 40, scale = 1.0), # mean ~40
-  mean_gain = rlnorm(n_sims, meanlog = log(params$mean_effect_years_gain_on_detection), sdlog = 0.6),
-  prop_res = rbeta(n_sims, 40, 60),             # mean ~0.4
-  p_resup_res = rbeta(n_sims, 20, 80),          # mean ~0.2
-  p_resup_beh = rbeta(n_sims, 60, 40),          # mean ~0.6
-  annual_non_suppression = rbeta(n_sims, 10, 90) # mean ~0.1
+  ab_sensitivity = rbeta(n_sims, 60, 40),
+  ab_specificity = rbeta(n_sims, 95, 5),
+  
+  cost_ab = rgamma(n_sims, shape = 4, scale = 0.6),
+  cost_pcr = rgamma(n_sims, shape = 40, scale = 1.0),
+  
+  mean_gain = rlnorm(
+    n_sims,
+    meanlog = log(params$mean_effect_years_gain_on_detection),
+    sdlog = 0.6
+  ),
+  
+  prop_res = rbeta(n_sims, 40, 60),
+  p_resup_res = rbeta(n_sims, 20, 80),
+  p_resup_beh = rbeta(n_sims, 60, 40),
+  
+  annual_non_suppression = rbeta(n_sims, 10, 90),
+  mort_rate_suppressed = rbeta(n_sims, 2, 198),   # mean ~0.01
+  mort_rate_unsuppressed = rbeta(n_sims, 6, 94)   # mean ~0.06
 )
 
 # Run PSA for two policies at a chosen frequency (e.g., biannual)
@@ -355,20 +453,21 @@ psa_all <- freq_scenarios %>%
             mean_gain = mean_gain,
             prop_res = prop_res,
             p_resup_res = p_resup_res,
-            p_resup_beh = p_resup_beh
+            p_resup_beh = p_resup_beh,
+            mort_rate_suppressed = mort_rate_suppressed,
+            mort_rate_unsuppressed = mort_rate_unsuppressed
           ))
         ) %>%
         unnest(out) %>%
-        transmute(
-          delta_cost,
-          delta_eff#,
-          # freq_label = freq_label
-        )
+        transmute(#sim, 
+          delta_cost, 
+          delta_eff, 
+          delta_LY, delta_DALY)
     })
   ) %>%
   unnest(psa)
 
-ce_plane_all <- ggplot(psa_all, aes(x = delta_eff, y = delta_cost)) +
+ce_plane_all <- ggplot(psa_all, aes(x = delta_DALY, y = delta_cost)) +
   geom_point(alpha = 0.25, size = 0.7) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = 0, linetype = "dashed") +
@@ -395,7 +494,7 @@ print(ce_plane_all)
 # CEAC: proportion of sims where NMB > 0 across WTPs
 ceac_all <- psa_all %>%
   crossing(WTP = seq(0, 1000, by = 20)) %>%
-  mutate(NMB = WTP * delta_eff - delta_cost) %>%
+  mutate(NMB = WTP * delta_DALY - delta_cost) %>%
   group_by(freq_label, WTP) %>%
   summarize(
     pr_CE = mean(NMB > 0),
