@@ -10,113 +10,143 @@
 
 library(DiagrammeR)
 library(rsvg)
+library(glue)
 
 # ---- Edit labels here if you want to customize text ----
 labels <- list(
-  cohort = "Cohort of PLWH monitored\n(N persons; annual probability of viraemia = p_v)",
   
-  pcr_all = "Routine HIV RNA (PCR) for everyone\n(1 test/person-year; cost = c_PCR + c_visit)",
-  pcr_pos = "PCR: VL ≥ 1000\n(True viraemia detected)",
-  pcr_neg = "PCR: VL < 1000\n(Virally suppressed)",
-  manage = "Clinical response (EAC ± regimen change)\nProbability of re-suppression: p_res\n(weighted by resistance vs behaviour)",
-  resup = "Re-suppressed earlier\n(benefit: Δt years gained)",
-  noresup = "Not re-suppressed\n(no benefit)",
-  note_pcr = "Outcomes used in code: cost_pcronly, eff_pcronly\n(assumes average detection delay ≈ interval/2)",
+  cohort =
+    "Cohort of adults receiving ART
+(N persons entering simulation)",
   
-  ab_triage = "Antibody (Ab) triage at chosen frequency\n(f tests/year; cost = c_Ab + c_visit)",
-  ab_pos = "Ab positive\n(True pos: sens among viraemic\nFalse pos: 1−spec among suppressed)",
-  ab_neg = "Ab negative\n(False neg possible if viraemic)",
-  pcr_conf = "Confirmatory PCR for Ab+ only\n(expected PCR/person-year = f·P(Ab+)\n(additional cost = c_PCR + c_visit)",
-  manage2 = "If PCR confirms VL ≥ 1000 → clinical response\nRe-suppression probability: p_res (weighted)\nEarlier detection benefit depends on Δdelay vs PCR-only",
-  net = "Net outcomes used in code:\nΔcost = cost_triage − cost_pcronly;\nΔeff = eff_triage − eff_pcronly; ICER = Δcost/Δeff",
-  note_triage = "Note: Ab− branch implies missed/late detection for some viraemia\n(in code simplified via sens and Δdelay)."
+  pcr_all =
+    "Routine HIV RNA PCR monitoring
+1 test per person-year
+Cost = cPCR + cvisit",
+  
+  pcr_pos =
+    "Detectable viral load
+(VL ≥1000 copies/mL)",
+  
+  pcr_neg =
+    "Viral suppression maintained",
+  
+  manage =
+    "Clinical management after detection:
+adherence support or regimen switch
+based on cause of rebound",
+  
+  note_pcr =
+    "Outputs:
+Annual cost
+Suppression-years
+Life-years
+DALYs",
+  
+  ab_triage =
+    "Antibody triage at frequency f
+(annual to 6-weekly)
+Cost = cAb + cvisit",
+  
+  ab_pos =
+    "Reactive antibody test
+Proceed to confirmatory PCR",
+  
+  pcr_conf =
+    "Confirmatory PCR
+performed only after
+positive antibody result",
+  
+  manage2 =
+    "Earlier detection may improve:
+re-suppression probability
+reduce mortality
+reduce disability",
+  
+  net =
+    "Incremental outcomes:
+Δ Cost
+Δ Suppression-years
+Δ Life-years
+Δ DALYs
+
+Primary ICER:
+Cost per DALY averted"
 )
 
 # ---- Graphviz (DOT) specification ----
-dot <- sprintf('
-  digraph cohort_model {
-    graph [layout = dot, rankdir = TB, fontsize = 18, labelloc = "t",
-           label = "",#Cohort model schematic corresponding to ce_ab_triage.R
-           splines = true]
-    node  [shape = box, style = "rounded,filled", fontname = Helvetica, color = "#111827",
-           fontsize = 11, penwidth = 1.2]
-    edge  [fontname = Helvetica, fontsize = 10, color = "#111827", penwidth = 1.1]
+dot <- glue('
+digraph cohort_model {{
 
-    // --- Left panel: PCR-only ---
-    subgraph cluster_pcr {
-      label = "Strategy A: PCR-only monitoring";
-      color = "#c7d2fe";
-      style = "rounded";
+graph [
+  layout = dot,
+  rankdir = TB,
+  fontsize = 20,
+  labelloc = "t",
+  # label = "Figure 1. Decision-analytic cohort model comparing PCR-only monitoring with antibody triage",
+  splines = true
+]
 
-      cohort1 [label = "%s", fillcolor = "#eef2ff"];
-      pcr_all [label = "%s", fillcolor = "#ecfeff"];
-      pcr_pos [label = "%s", fillcolor = "#fff7ed"];
-      pcr_neg [label = "%s", fillcolor = "#f0fdf4"];
-      manage1 [label = "%s", fillcolor = "#fefce8"];
-      resup   [label = "%s", fillcolor = "#f0fdf4"];
-      noresup [label = "%s", fillcolor = "#fee2e2"];
-      note1   [label = "%s", fillcolor = "#ffffff", fontsize = 9];
+node [
+  shape = box,
+  style = "rounded,filled",
+  fontname = Helvetica,
+  fontsize = 11,
+  color = "#111827",
+  penwidth = 1.2
+]
 
-      cohort1 -> pcr_all;
-      pcr_all -> pcr_pos [label = "p_v"];
-      pcr_all -> pcr_neg [label = "1−p_v"];
-      pcr_pos -> manage1;
-      manage1 -> resup   [label = "p_res"];
-      manage1 -> noresup [label = "1−p_res"];
-      resup   -> note1   [style = invis];
-      noresup -> note1   [style = invis];
+edge [
+  fontname = Helvetica,
+  fontsize = 10,
+  color = "#111827",
+  penwidth = 1.1
+]
 
-      {rank = same; pcr_pos; pcr_neg}
-      {rank = same; resup; noresup}
-    }
+subgraph cluster_pcr {{
+  label = "A. PCR-only monitoring";
+  color = "#c7d2fe";
+  style = "rounded";
 
-    // --- Right panel: Ab triage -> PCR ---
-    subgraph cluster_triage {
-      label = "Strategy B: Ab triage → confirmatory PCR";
-      color = "#c7d2fe";
-      style = "rounded";
+  cohort1   [label="{labels$cohort}", fillcolor="#eef2ff"];
+  pcr_all   [label="{labels$pcr_all}", fillcolor="#ecfeff"];
+  pcr_pos   [label="{labels$pcr_pos}", fillcolor="#fff7ed"];
+  pcr_neg   [label="{labels$pcr_neg}", fillcolor="#f0fdf4"];
+  manage1   [label="{labels$manage}", fillcolor="#fefce8"];
+  outcomes1 [label="{labels$note_pcr}", fillcolor="#eef2ff"];
 
-      cohort2 [label = "%s", fillcolor = "#eef2ff"];
-      ab_tri  [label = "%s", fillcolor = "#ecfeff"];
-      ab_pos  [label = "%s", fillcolor = "#fff7ed"];
-      ab_neg  [label = "%s", fillcolor = "#f0fdf4"];
-      pcr_conf [label = "%s", fillcolor = "#fefce8"];
-      manage2  [label = "%s", fillcolor = "#ffffff"];
-      net      [label = "%s", fillcolor = "#eef2ff"];
-      note2    [label = "%s", fillcolor = "#ffffff", fontsize = 9];
+  cohort1 -> pcr_all;
+  pcr_all -> pcr_pos [label="VL rebound"];
+  pcr_all -> pcr_neg [label="No rebound"];
+  pcr_pos -> manage1;
+  manage1 -> outcomes1;
+}}
 
-      cohort2 -> ab_tri;
-      ab_tri -> ab_pos [label = "P(Ab+) = p_v·sens + (1−p_v)·(1−spec)"];
-      ab_tri -> ab_neg [label = "P(Ab−)"];
-      ab_pos -> pcr_conf;
-      pcr_conf -> manage2;
-      manage2 -> net;
-      net -> note2;
+subgraph cluster_triage {{
+  label = "B. Antibody triage strategy";
+  color = "#c7d2fe";
+  style = "rounded";
 
-      {rank = same; ab_pos; ab_neg}
-    }
+  cohort2   [label="{labels$cohort}", fillcolor="#eef2ff"];
+  ab_test   [label="{labels$ab_triage}", fillcolor="#ecfeff"];
+  ab_pos    [label="{labels$ab_pos}", fillcolor="#fff7ed"];
+  ab_neg    [label="No reactive Ab result", fillcolor="#f0fdf4"];
+  pcr_conf  [label="{labels$pcr_conf}", fillcolor="#fefce8"];
+  manage2   [label="{labels$manage2}", fillcolor="#ffffff"];
+  outcomes2 [label="{labels$net}", fillcolor="#eef2ff"];
 
-    // Make both cohort nodes align at top
-    {rank = same; cohort1; cohort2}
-  }
-',
-               labels$cohort,
-               labels$pcr_all,
-               labels$pcr_pos,
-               labels$pcr_neg,
-               labels$manage,
-               labels$resup,
-               labels$noresup,
-               labels$note_pcr,
-               labels$cohort,
-               labels$ab_triage,
-               labels$ab_pos,
-               labels$ab_neg,
-               labels$pcr_conf,
-               labels$manage2,
-               labels$net,
-               labels$note_triage
-)
+  cohort2 -> ab_test;
+  ab_test -> ab_pos [label="Positive"];
+  ab_test -> ab_neg [label="Negative"];
+  ab_pos -> pcr_conf;
+  pcr_conf -> manage2;
+  manage2 -> outcomes2;
+}}
+
+{{rank = same; cohort1; cohort2}}
+
+}}
+')
 
 # Render diagram in RStudio Viewer / notebook
 viz <- grViz(dot)
@@ -139,5 +169,5 @@ if (requireNamespace("DiagrammeRsvg", quietly = TRUE)) {
 }
 
 # Convert SVG file to PNG
-rsvg_png("cohort_model_schematic.svg", "cohort_model_schematic.png",
+rsvg_png("CE_AB_analysis/cohort_model_schematic.svg", "CE_AB_analysis/cohort_model_schematic.png",
          width = 2400, height = 1200)
