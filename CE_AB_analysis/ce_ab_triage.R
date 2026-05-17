@@ -34,6 +34,7 @@ params <- list(
   cost_ab = 2.0,                   # cost per Ab test
   cost_pcr = 40.0,                 # cost per PCR test
   cost_clinic_visit = 5.0,         # incremental cost if visit needed for test/triage (per test round)
+  cost_visit_ab = 0,               # Cost of AB clinic visit if we use POC testing 
   
   # Effectiveness: benefit of earlier detection
   # For a person whose VL rebound is detected earlier via Ab triage, we model an expected gain (years of VL suppression regained earlier)
@@ -72,7 +73,8 @@ calc_per_person <- function(frequency_yrs = 1,
                             ab_spec = params_list$ab_specificity,
                             cost_ab = params_list$cost_ab,
                             cost_pcr = params_list$cost_pcr,
-                            cost_visit = params_list$cost_clinic_visit,
+                            cost_visit_ab = params_list$cost_clinic_visit,
+                            cost_visit_pcr = params_list$cost_clinic_visit,
                             mean_gain = params_list$mean_effect_years_gain_on_detection,
                             prop_res = params_list$prop_reistance,
                             p_resup_res = params_list$p_resupp_after_resistance_detect,
@@ -84,113 +86,127 @@ calc_per_person <- function(frequency_yrs = 1,
                             life_expectancy_remaining = params_list$life_expectancy_remaining,
                             dw_suppressed = params_list$dw_suppressed,
                             dw_unsuppressed = params_list$dw_unsuppressed
-) { #browser()
-  # Mortality
-  p_death_suppressed <- 1 - exp(-mort_rate_suppressed)
+) {
+  
+  # ---- Mortality probabilities (annual) ----
+  p_death_suppressed   <- 1 - exp(-mort_rate_suppressed)
   p_death_unsuppressed <- 1 - exp(-mort_rate_unsuppressed)
   
-  # expected number of Ab tests per year
+  # ---- Test frequency ----
   ab_tests_per_year <- ifelse(is.infinite(frequency_yrs) || frequency_yrs <= 0, 0, 1 / frequency_yrs)
   
-  # PCR-only: assume 1 PCR per person per year (or 0? choose policy)
-  # We'll assume PCR-only means routine PCR once per year for everyone (you can change).
-  pcr_tests_per_year_pcronly <- 1   # changeable if needed
+  # ---- PCR-only strategy ----
+  pcr_tests_per_year_pcronly <- 1  # routine annual PCR
   
-  # Costs under PCR-only per person-year
-  cost_pcronly <- pcr_tests_per_year_pcronly * (cost_pcr + cost_visit)
+  cost_pcronly <- pcr_tests_per_year_pcronly *
+    (cost_pcr + cost_visit_pcr)
   
-  # Effectiveness: PCR-only assumed to detect all rebounds at that routine PCR visit; average delay to detection = 0.5 year if annual
-  # For simplicity, assume average delay under PCR-only = testing_interval/2 = 0.5 year
-  # But many rebounds may happen between visits; for comparability we compute expected "delay" to detection:
+  # PCR-only: expected suppression-years regained (your existing shorthand)
   delay_pcronly_years <- 0.5 * (1 / pcr_tests_per_year_pcronly)
-  # expected gain in suppression-year if detected earlier compared to no detection:
-  # we treat the gain as mean_gain * probability of resuppression on detection (weighted)
+  
   p_resupp_weighted <- prop_res * p_resup_res + (1 - prop_res) * p_resup_beh
-  eff_pcronly <- annual_non_suppression * p_resupp_weighted * mean_gain  # years-of-suppression gained per person-year
-  # baseline mortality (PCR only)
-  mort_pcronly <- annual_non_suppression * p_death_unsuppressed +
-    (1 - annual_non_suppression) * p_death_suppressed
+  eff_pcronly <- annual_non_suppression * p_resupp_weighted * mean_gain  # suppression-years regained per person-year
   
-  # AB_triage:
-  # If Ab test positive -> confirm with PCR (assume PCR applied only to positives)
-  # Expected numbers:
-  ab_pos_if_viremic <- ab_sens       # sensitivity among viremic
-  ab_pos_if_not <- 1 - ab_spec       # false positive rate among non-viremic
+  # Convert eff_pcronly into an "effective" unsuppressed fraction (bounded to [0,1])
+  unsuppressed_pcronly <- annual_non_suppression - eff_pcronly
+  unsuppressed_pcronly <- pmin(1, pmax(0, unsuppressed_pcronly))
   
-  # expected PCR confirmations per person-year under triage:
-  # P(ab positive) = P(viremic)*ab_sens + (1-P(viremic))*(1-ab_spec)
-  p_ab_pos <- annual_non_suppression * ab_pos_if_viremic + (1 - annual_non_suppression) * ab_pos_if_not
+  # Mortality and DALY components for PCR-only (CONSISTENT with triage arm)
+  mort_pcronly <- unsuppressed_pcronly * p_death_unsuppressed +
+    (1 - unsuppressed_pcronly) * p_death_suppressed
+  
+  YLL_pcronly <- mort_pcronly * life_expectancy_remaining
+  YLD_pcronly <- (1 - unsuppressed_pcronly) * dw_suppressed +
+    unsuppressed_pcronly * dw_unsuppressed
+  
+  DALY_pcronly <- YLL_pcronly + YLD_pcronly
+  
+  
+  # ---- AB-triage strategy ----
+  # Ab test positive -> confirm PCR
+  ab_pos_if_viremic <- ab_sens
+  ab_pos_if_not     <- 1 - ab_spec
+  
+  p_ab_pos <- annual_non_suppression * ab_pos_if_viremic +
+    (1 - annual_non_suppression) * ab_pos_if_not
+  
   pcr_confirm_per_year_triage <- p_ab_pos * ab_tests_per_year
   
-  # cost per person-year under triage:
-  cost_triage <- ab_tests_per_year * (cost_ab + cost_visit) + pcr_confirm_per_year_triage * (cost_pcr + cost_visit)
+  cost_triage <- 
+    ab_tests_per_year * (cost_ab + cost_visit_ab) +
+    pcr_confirm_per_year_triage * (cost_pcr + cost_visit_pcr)
   
-  # Effectiveness under triage: proportion of viremic detected earlier depends on testing interval and ab_sensitivity:
-  # Assume mean delay to detection under periodic Ab testing = testing_interval/2 + any assay-specific delay (e.g., AB_rebound_delay). Here we assume detection interval = frequency_yrs/2.
+  # Detection timing
   delay_triage_years <- frequency_yrs / 2
-  
-  # The earlier detection relative to PCR-only is: delay_pcronly_years - delay_triage_years
-  # But only if triage delay < pcr delay, else no earlier detection.
   delta_delay <- pmax(0, delay_pcronly_years - delay_triage_years)
   
-  # expected effect per person-year = (prob of being viremic in year)*(prob Ab detects them when tested during the period relative to PCR)*prob re-suppression * years gained
-  # For simplicity: assume proportion of viremic detected by triage during the year = ab_sensitivity * (1 - delay_triage_years) ??? (too complex).
-  # We'll approximate that testing at interval f will catch a fraction sens_frac = frequency_yrs/(frequency_yrs + delay_pcronly_years) * ab_sens
-  # Simpler approach: suppose fraction of viremic caught earlier = ab_sens (since those who are viremic in the year are testable) * indicator(delta_delay>0)
   frac_caught_earlier <- ifelse(delta_delay > 0, ab_sens, 0)
   
-  # Adjust probability of re-suppression depending on resistance/behaviour:
-  # Weighted expected re-suppression probability among those detected earlier:
   p_resupp_weighted_earlier <- prop_res * p_resup_res * eff_mult_res +
     (1 - prop_res) * p_resup_beh * eff_mult_beh
   
   eff_triage <- annual_non_suppression * frac_caught_earlier * p_resupp_weighted_earlier * delta_delay
-  # triage reduces unsuppressed time
-  mort_triage <- mort_pcronly - eff_triage * 
-    (p_death_unsuppressed - p_death_suppressed)
   
-  #Years of Life Lost (YLL)
-  YLL_pcronly <- mort_pcronly * life_expectancy_remaining
-  YLL_triage  <- mort_triage  * life_expectancy_remaining
-  
-  YLD_pcronly <- (1 - annual_non_suppression) * dw_suppressed +
-    annual_non_suppression * dw_unsuppressed
-  
+  # Convert eff_triage into an "effective" unsuppressed fraction (bounded to [0,1])
   unsuppressed_triage <- annual_non_suppression - eff_triage
+  unsuppressed_triage <- pmin(1, pmax(0, unsuppressed_triage))
   
+  mort_triage <- unsuppressed_triage * p_death_unsuppressed +
+    (1 - unsuppressed_triage) * p_death_suppressed
+  
+  YLL_triage <- mort_triage * life_expectancy_remaining
   YLD_triage <- (1 - unsuppressed_triage) * dw_suppressed +
     unsuppressed_triage * dw_unsuppressed
   
-  DALY_pcronly <- YLL_pcronly + YLD_pcronly
-  DALY_triage  <- YLL_triage  + YLD_triage
+  DALY_triage <- YLL_triage + YLD_triage
   
-  delta_DALY <- DALY_pcronly - DALY_triage   # DALYs averted
-  # return per-person-year costs and effects
-  # return per-person-year costs and effects
+  
+  # ---- Incremental outcomes ----
+  delta_cost <- cost_triage - cost_pcronly
+  
+  # Suppression-years gained: triage vs PCR-only (as originally intended)
+  delta_eff <- eff_triage - eff_pcronly
+  
+  # Life-years gained: convert deaths averted into LY using remaining life expectancy
+  delta_deaths <- mort_pcronly - mort_triage
+  delta_LY <- delta_deaths * life_expectancy_remaining
+  
+  # DALYs averted
+  delta_DALY <- DALY_pcronly - DALY_triage
+  
+  
+  # ---- ICERs ----
+  ICER_suppression <- ifelse(delta_eff == 0, NA, delta_cost / delta_eff)
+  ICER_LY          <- ifelse(delta_LY  == 0, NA, delta_cost / delta_LY)
+  ICER_DALY        <- ifelse(delta_DALY== 0, NA, delta_cost / delta_DALY)
+  
   tibble(
     ab_tests_per_year = ab_tests_per_year,
     pcr_tests_per_year_pcronly = pcr_tests_per_year_pcronly,
     pcr_tests_per_year_triage = pcr_confirm_per_year_triage,
     
     cost_pcronly = cost_pcronly,
-    cost_triage = cost_triage,
+    cost_triage  = cost_triage,
     
     eff_pcronly = eff_pcronly,
-    eff_triage = eff_triage,
+    eff_triage  = eff_triage,
+    
+    unsuppressed_pcronly = unsuppressed_pcronly,
+    unsuppressed_triage  = unsuppressed_triage,
     
     mort_pcronly = mort_pcronly,
-    mort_triage = mort_triage,
+    mort_triage  = mort_triage,
     
-    # Core incremental outcomes
-    delta_cost = cost_triage - cost_pcronly,
-    delta_eff = eff_triage - eff_pcronly,          # suppression-years
-    delta_LY = mort_pcronly - mort_triage,         # life-years gained
-    delta_DALY = delta_DALY,                       # DALYs averted
+    delta_cost = delta_cost,
+    delta_eff  = delta_eff,
+    delta_LY   = delta_LY,
+    delta_DALY = delta_DALY,
     
-    # ICERs
-    ICER_suppression = ifelse(delta_eff == 0, NA, delta_cost / delta_eff),
-    ICER_LY = ifelse(delta_LY == 0, NA, delta_cost / delta_LY),
-    ICER_DALY = ifelse(delta_DALY == 0, NA, delta_cost / delta_DALY)
+    ICER_suppression = ICER_suppression,
+    ICER_LY          = ICER_LY,
+    ICER_DALY        = ICER_DALY,
+    DALY_pcronly     = DALY_pcronly,
+    DALY_triage      = DALY_triage
   )
 }
 
@@ -211,11 +227,11 @@ calc_per_person(0.0833, params) # ~monthly
 freqs_yrs <- c(1, 0.5, 0.25, 0.125, 1/12)  # annual, biannual, quarterly, 6-week ~0.125yrs, monthly
 prevalences <- c(0.02, 0.05, 0.10, 0.20)   # sensitivity to non-suppression rate
 
-grid <- expand.grid(frequency_yrs = freqs_yrs, annual_non_suppression = prevalences) %>%
+scenario_grid <- expand.grid(frequency_yrs = freqs_yrs, annual_non_suppression = prevalences) %>%
   arrange(annual_non_suppression, frequency_yrs) %>%
   as_tibble()
 
-results <- grid %>%
+results <- scenario_grid %>%
   rowwise() %>%
   mutate(out = list(calc_per_person(frequency_yrs = frequency_yrs,
                                     params_list = params,
@@ -257,6 +273,129 @@ q2_summary <- results %>%
             .groups = "drop")
 
 print(q2_summary)
+
+### Assuming we have POC AB testing and remove clinic visits
+results_poc <- scenario_grid %>%
+  
+  rowwise() %>%
+  
+  mutate(
+    out = list(
+      calc_per_person(
+        frequency_yrs = frequency_yrs,
+        params_list = params,
+        annual_non_suppression = annual_non_suppression,
+        
+        # Remove visit cost for Ab testing
+        cost_visit_ab = 0
+      )
+    )
+  ) %>%
+  
+  unnest(out) %>%
+  
+  mutate(
+    
+    # -----------------------------------------
+    # Frequency labels
+    # -----------------------------------------
+    freq_label = case_when(
+      frequency_yrs == 1     ~ "Annual",
+      frequency_yrs == 0.5   ~ "Biannual",
+      frequency_yrs == 0.25  ~ "Quarterly",
+      frequency_yrs == 0.125 ~ "6-weekly",
+      abs(frequency_yrs - 1/12) < 1e-6 ~ "Monthly",
+      TRUE ~ paste0(round(1 / frequency_yrs, 1), "x/yr")
+    ),
+    
+    freq_label = factor(
+      freq_label,
+      levels = c(
+        "6-weekly",
+        "Quarterly",
+        "Biannual",
+        "Annual",
+        "Monthly"
+      )
+    ),
+    
+    # -----------------------------------------
+    # Dominance indicators
+    # -----------------------------------------
+    triage_cheaper =
+      cost_triage < cost_pcronly,
+    
+    triage_more_effective =
+      eff_triage > eff_pcronly,
+    
+    # -----------------------------------------
+    # Scenario label
+    # -----------------------------------------
+    scenario = "Point-of-care"
+    
+  )
+
+results_facility <- results %>%
+  mutate(
+    scenario = "Facility-based"
+  )
+
+results_compare <- bind_rows(
+  results_facility,
+  results_poc
+)
+
+results_compare <- results_compare %>%
+  mutate(
+    NMB_500 = 500 * delta_DALY - delta_cost,
+    prevalence_label = paste0(
+      annual_non_suppression * 100,
+      "% prevalence"
+    )
+  )
+
+p_poc_nmb <- ggplot(
+  results_compare,
+  aes(
+    x = freq_label,
+    y = NMB_500,
+    group = scenario,
+    color = scenario
+  )
+) +
+  
+  geom_line(linewidth = 1.3) +
+  geom_point(size = 3) +
+  
+  facet_wrap(~ prevalence_label) +
+  
+  scale_color_manual(
+    values = c(
+      "Facility-based" = "#d95f02",
+      "Point-of-care" = "#1b9e77"
+    )
+  ) +
+  
+  labs(
+    x = "Monitoring interval",
+    y = "Net monetary benefit (US$)",
+    color = "",
+    title = "Economic impact of point-of-care antibody monitoring"
+  ) +
+  
+  theme_minimal(base_size = 15) +
+  theme(
+    panel.grid = element_blank(),
+    strip.text = element_text(face = "bold"),
+    axis.text = element_text(color = "black"),
+    legend.position = "bottom",
+    plot.title = element_text(
+      face = "bold",
+      hjust = 0.5
+    )
+  )
+
+print(p_poc_nmb)
 
 # ---------------------------------
 # 4) Cost-effectiveness across WTP thresholds (Q3 + Q4)
@@ -328,6 +467,78 @@ publication_table <- ce_summary %>%
 
 print(publication_table)
 
+# ============================================================
+# TABLE: Absolute outcomes for PCR-only versus Ab-triage
+# ============================================================
+
+absolute_table <- results %>%
+  
+  mutate(
+    
+    # -----------------------------
+    # Human-readable monitoring labels
+    # -----------------------------
+    `Monitoring interval` = freq_label,
+    
+    # -----------------------------
+    # PCR-only strategy outcomes
+    # -----------------------------
+    `Annual cost: PCR-only (US$)` =
+      round(cost_pcronly, 2),
+    
+    `Suppression-years: PCR-only` =
+      round(eff_pcronly, 4),
+    
+    `Mean time unsuppressed: PCR-only (years)` =
+      round(unsuppressed_pcronly, 4),
+    
+    `Mortality risk: PCR-only` =
+      round(mort_pcronly, 4),
+    
+    `DALYs: PCR-only` =
+      round(DALY_pcronly, 4),
+    
+    # -----------------------------
+    # Antibody-triage strategy outcomes
+    # -----------------------------
+    `Annual cost: Ab-triage (US$)` =
+      round(cost_triage, 2),
+    
+    `Suppression-years: Ab-triage` =
+      round(eff_triage, 4),
+    
+    `Mean time unsuppressed: Ab-triage (years)` =
+      round(unsuppressed_triage, 4),
+    
+    `Mortality risk: Ab-triage` =
+      round(mort_triage, 4),
+    
+    `DALYs: Ab-triage` =
+      round(DALY_triage, 4)
+    
+  ) %>%
+  
+  # -----------------------------
+# Keep only variables for publication
+# -----------------------------
+dplyr::select(
+  `Monitoring interval`,
+  
+  `Annual cost: PCR-only (US$)`,
+  `Suppression-years: PCR-only`,
+  `Mean time unsuppressed: PCR-only (years)`,
+  `Mortality risk: PCR-only`,
+  `DALYs: PCR-only`,
+  
+  `Annual cost: Ab-triage (US$)`,
+  `Suppression-years: Ab-triage`,
+  `Mean time unsuppressed: Ab-triage (years)`,
+  `Mortality risk: Ab-triage`,
+  `DALYs: Ab-triage`
+)
+
+# View table
+print(absolute_table)
 # ---------------------------------
 # 5) Tornado (univariate) sensitivity analysis
 # ---------------------------------
@@ -718,12 +929,12 @@ print(ceac_plot_all)
 # Save main results tables
 write.csv(results, "CE_AB_analysis/ab_triage_results_sweep.csv", row.names = FALSE)
 write.csv(publication_table, "CE_AB_analysis/ab_triage_publication_table.csv", row.names = FALSE)
-
+write.csv(absolute_table, "CE_AB_analysis/absolute_table_publication_table.csv", row.names = FALSE)
 # Save example plots
 ggsave("CE_AB_analysis/tornado_all_frequencies.png", tornado_plot_all, width = 12, height = 8)
 ggsave("CE_AB_analysis/deterministic_headline_figure.png", final_deterministic_figure, width = 12, height = 8, dpi = 600)
 ggsave("CE_AB_analysis/ce_plane_all_frequencies.png", ce_plane_all, width = 12, height = 8)
 ggsave("CE_AB_analysis/ceac_all_frequencies.png", ceac_plot_all, width = 12, height = 8)
-
+ggsave("CE_AB_analysis/p_poc_nmb.png", p_poc_nmb, width = 10, height = 8)
 
 message("Completed. Results saved to CSV and plots saved. Adjust parameters in 'params' and rerun as needed.")
