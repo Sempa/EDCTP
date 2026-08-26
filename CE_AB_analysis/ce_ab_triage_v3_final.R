@@ -235,9 +235,9 @@ fig_decision_map <- ggplot(results_decision, aes(x = ab_sens, y = freq_num, fill
   labs(
     x = "Antibody Test Sensitivity (Per Test)",
     y = "Testing Frequency (Tests per Year)",
-    fill = "Policy Verdict",
-    title = "Operational Requirements for Antibody Triage Success",
-    subtitle = "Decision boundaries across antibody sensitivity and monitoring frequency (WTP = $500/DALY)"
+    fill = "Policy Verdict"#,
+    # title = "Operational Requirements for Antibody Triage Success",
+    # subtitle = "Decision boundaries across antibody sensitivity and monitoring frequency (WTP = $500/DALY)"
   ) +
   theme_minimal(base_size = 14) +
   theme(legend.position = "bottom", panel.grid = element_blank(), plot.title = element_text(face = "bold"))
@@ -345,10 +345,10 @@ fig_headline_threshold <- ggplot(sens_results, aes(x = ab_sens, y = delta_DALY, 
   labs(
     x = "Antibody Test Sensitivity (Per Test)",
     y = "DALYs Averted per Person-Year vs PCR-Only Baseline",
-    color = "Testing Interval",
+    color = "Testing Interval"#,
     # linetype = "Strategy",
-    title = "Sensitivity Thresholds Required for Health Improvements",
-    subtitle = "Accounting for 4-week seroconversion lag and continuous rebound arrival"
+    # title = "Sensitivity Thresholds Required for Health Improvements",
+    # subtitle = "Accounting for 4-week seroconversion lag and continuous rebound arrival"
   ) +
   theme_minimal(base_size = 14) +
   theme(panel.grid.minor = element_blank(), legend.position = "bottom")
@@ -496,7 +496,7 @@ p_poc_nmb <- ggplot(results_compare, aes(x = freq_label, y = NMB_500, group = sc
   geom_point(size = 3) +
   facet_wrap(~ prevalence_label) +
   scale_color_manual(values = c("Facility-based" = "#d95f02", "Point-of-care" = "#1b9e77")) +
-  labs(x = "Monitoring interval", y = "Net monetary benefit (US$)", color = "", title = "Economic impact of point-of-care antibody monitoring") +
+  labs(x = "Monitoring interval", y = "Net monetary benefit (US$)", color = "") + # , title = "Economic impact of point-of-care antibody monitoring"
   theme_minimal(base_size = 15) +
   theme(panel.grid = element_blank(), strip.text = element_text(face = "bold"), legend.position = "bottom")
 
@@ -554,7 +554,7 @@ fig_voi_contour <- ggplot(voi_results, aes(x = ab_sens, y = cost_ab, fill = CE_C
   scale_fill_manual(values = c("Dominant" = "#1b9e77", "Cost-effective" = "#7fc97f", "Not cost-effective" = "#fdc086", "Health-harming" = "#d95f02")) +
   scale_x_continuous(labels = scales::percent) +
   scale_y_continuous(labels = dollar_format()) +
-  labs(x = "Antibody Test Sensitivity", y = "Unit Cost of Antibody Test (USD)", fill = "Economic Verdict", title = "Decision Boundaries for Quarterly Antibody Triage (WTP = $500/DALY)") +
+  labs(x = "Antibody Test Sensitivity", y = "Unit Cost of Antibody Test (USD)", fill = "Economic Verdict") + # , title = "Decision Boundaries for Quarterly Antibody Triage (WTP = $500/DALY)"
   theme_minimal(base_size = 14)
 
 print(fig_voi_contour)
@@ -597,7 +597,7 @@ tornado_plot_all <- ggplot(tornado_all) +
   geom_linerange(aes(x = param, ymin = min_change, ymax = max_change), size = 5) +
   coord_flip() +
   facet_wrap(~ forcats::fct_relevel(freq_label, "6-weekly", "Quarterly", "Biannual", "Annual"), scales = "free_x") +
-  labs(x = "", y = "Change in NMB (USD, WTP = 500 per DALY averted)", title = "One-way sensitivity analysis across monitoring frequencies") +
+  labs(x = "", y = "Change in NMB (USD, WTP = 500 per DALY averted)") + #, title = "One-way sensitivity analysis across monitoring frequencies"
   theme_minimal()
 
 print(tornado_plot_all)
