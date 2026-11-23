@@ -6,6 +6,8 @@ library(plotly)
 library(tidyverse)
 library(htmlwidgets)
 library(webshot2)
+library(gt)
+library(scales)
 
 # --- Parameter grid ---
 spec_values <- c(seq(0.60, 0.90, 0.10), 0.95)
@@ -587,3 +589,497 @@ contour_plot <- ggplot(plot_data,
     size = 3
   )
 ggsave("contour_plot.png", plot = contour_plot, width = 13, height = 10, dpi = 300)
+
+###############################################################
+# SUPPLEMENTARY UNCERTAINTY ANALYSES
+# HIV Antibody-Guided VL Monitoring Paper
+###############################################################
+
+RNGversion("3.6.0")
+set.seed(2026)
+
+###############################################################
+# MODEL FUNCTION
+###############################################################
+
+compute_metrics <- function(
+    AB_Specificity,
+    AB_rebound_delay,
+    annual_rebound_rate,
+    population = 1000
+){
+  
+  monitoring_scenario <- c(
+    "Annual VL",
+    "Annual AB",
+    "Biannual AB"
+  )
+  
+  N <- rep(population, 3)
+  
+  prim_VL_tests <- c(
+    population,
+    0,
+    0
+  )
+  
+  testing_interval <- c(
+    1,
+    1,
+    0.5
+  )
+  
+  AB_testing <- c(
+    0,
+    population,
+    population
+  )
+  
+  number_of_rebounds_PerAnnum <-
+    rep(
+      population * annual_rebound_rate,
+      3
+    )
+  
+  true_positives <- c(
+    population * annual_rebound_rate,
+    population * annual_rebound_rate,
+    population * annual_rebound_rate
+  )
+  
+  false_positives <- c(
+    0,
+    (N[2] - true_positives[2]) *
+      (1 - AB_Specificity),
+    
+    2 * (N[3] - true_positives[3]) *
+      (1 - AB_Specificity)
+  )
+  
+  vl_confirmation <- c(
+    0,
+    true_positives[2] + false_positives[2],
+    true_positives[3] + false_positives[3]
+  )
+  
+  total_VL <- c(
+    population,
+    vl_confirmation[2],
+    vl_confirmation[3]
+  )
+  
+  mean_delay_yrs <- c(
+    0.5,
+    (testing_interval[2] / 2) +
+      AB_rebound_delay,
+    
+    (testing_interval[3] / 2) +
+      AB_rebound_delay
+  )
+  
+  mean_delay_months <- mean_delay_yrs * 12
+  
+  tibble(
+    Scenario = monitoring_scenario,
+    Mean_delay_months = mean_delay_months,
+    Total_VL_per_year = total_VL
+  )
+}
+
+###############################################################
+# PROBABILISTIC SENSITIVITY ANALYSIS
+###############################################################
+RNGversion("3.6.0")
+set.seed(2026)
+n_sim <- 10000
+
+psa_inputs <- tibble(
+  
+  AB_Specificity = runif(
+    n_sim,
+    min = 0.60,
+    max = 0.95
+  ),
+  
+  AB_rebound_delay =
+    runif(
+      n_sim,
+      min = 0,
+      max = 0.40
+    ),
+  
+  annual_rebound_rate =
+    runif(
+      n_sim,
+      min = 0.04,
+      max = 0.50
+    )
+)
+
+psa_results <- psa_inputs %>%
+  mutate(
+    results =
+      pmap(
+        list(
+          AB_Specificity,
+          AB_rebound_delay,
+          annual_rebound_rate
+        ),
+        ~compute_metrics(
+          ..1,
+          ..2,
+          ..3,
+          population = 1000
+        ) %>%
+          select(
+            Scenario,
+            Mean_delay_months,
+            Total_VL_per_year
+          )
+      )
+  ) %>%
+  unnest(results) %>%
+  mutate(
+    VL_Saved_percent =
+      100 *
+      ((1000 - Total_VL_per_year) / 1000)
+  )
+
+###############################################################
+# TABLE S2
+# PSA RESULTS
+###############################################################
+
+table_S2 <- psa_results %>%
+  filter(
+    Scenario %in%
+      c(
+        "Annual AB",
+        "Biannual AB"
+      )
+  ) %>%
+  group_by(Scenario) %>%
+  summarise(
+    
+    Median_Delay =
+      median(
+        Mean_delay_months
+      ),
+    
+    Delay_LCL =
+      quantile(
+        Mean_delay_months,
+        .025
+      ),
+    
+    Delay_UCL =
+      quantile(
+        Mean_delay_months,
+        .975
+      ),
+    
+    Median_Saved =
+      median(
+        VL_Saved_percent
+      ),
+    
+    Saved_LCL =
+      quantile(
+        VL_Saved_percent,
+        .025
+      ),
+    
+    Saved_UCL =
+      quantile(
+        VL_Saved_percent,
+        .975
+      )
+    
+  ) %>%
+  mutate(
+    
+    Delay_95UI =
+      sprintf(
+        "%.1f (%.1f–%.1f)",
+        Median_Delay,
+        Delay_LCL,
+        Delay_UCL
+      ),
+    
+    Saved_95UI =
+      sprintf(
+        "%.1f (%.1f–%.1f)",
+        Median_Saved,
+        Saved_LCL,
+        Saved_UCL
+      )
+    
+  ) %>%
+  select(
+    Scenario,
+    Delay_95UI,
+    Saved_95UI
+  )
+
+# table_S2
+
+###############################################################
+# PUBLICATION TABLE
+###############################################################
+
+gt_S2 <- table_S2 %>%
+  gt() %>%
+  tab_header(
+    title =
+      "Table S2. Probabilistic Sensitivity Analysis"
+  ) %>%
+  cols_label(
+    Delay_95UI =
+      "Mean Delay (Months), Median (95% UI)",
+    
+    Saved_95UI =
+      "VL Tests Saved (%), Median (95% UI)"
+  )
+
+gtsave(
+  gt_S2,
+  "Table_S2_PSA.html"
+)
+
+write.csv(
+  table_S2,
+  "Table_S2_PSA.csv",
+  row.names = FALSE
+)
+
+###############################################################
+# SCENARIO UNCERTAINTY ANALYSIS
+###############################################################
+
+scenario_input <- tribble(
+  
+  ~Scenario_Set,
+  ~AB_Specificity,
+  ~AB_rebound_delay,
+  ~annual_rebound_rate,
+  
+  "Optimistic",
+  0.95,
+  0.00,
+  0.05,
+  
+  "Base case",
+  0.90,
+  0.10,
+  0.10,
+  
+  "Conservative",
+  0.80,
+  0.20,
+  0.20
+)
+
+scenario_results <- scenario_input %>%
+  mutate(
+    model =
+      pmap(
+        list(
+          AB_Specificity,
+          AB_rebound_delay,
+          annual_rebound_rate
+        ),
+        ~compute_metrics(
+          ..1,
+          ..2,
+          ..3
+        )
+      )
+  ) %>%
+  unnest(model) %>%
+  mutate(
+    VL_Saved_percent =
+      round(
+        100 *
+          (1000 - Total_VL_per_year) /
+          1000,
+        1
+      )
+  )
+
+###############################################################
+# TABLE S3
+###############################################################
+
+table_S3 <- scenario_results %>%
+  filter(
+    Scenario %in%
+      c(
+        "Annual AB",
+        "Biannual AB"
+      )
+  ) %>%
+  transmute(
+    
+    Scenario_Set,
+    
+    Monitoring_Strategy =
+      Scenario,
+    
+    Specificity =
+      AB_Specificity,
+    
+    Rebound_Delay =
+      AB_rebound_delay,
+    
+    Rebound_Rate =
+      annual_rebound_rate,
+    
+    Mean_Delay_Months =
+      round(
+        Mean_delay_months,
+        1
+      ),
+    
+    VL_Tests_Per_1000 =
+      round(
+        Total_VL_per_year,
+        0
+      ),
+    
+    VL_Saved_percent
+  )
+
+write.csv(
+  table_S3,
+  "Table_S3_Scenario_Analysis.csv",
+  row.names = FALSE
+)
+
+###############################################################
+# FIGURE S2
+# PSA DENSITY PLOT
+###############################################################
+
+fig_S2 <- ggplot(
+  psa_results %>%
+    filter(
+      Scenario %in%
+        c(
+          "Annual AB",
+          "Biannual AB"
+        )
+    ),
+  aes(
+    x = VL_Saved_percent,
+    fill = Scenario,
+    colour = Scenario
+  )
+) +
+  geom_density(
+    alpha = 0.3,
+    linewidth = 1.2
+  ) +
+  theme_classic(base_size = 18) +
+  labs(
+    x = "VL Tests Saved (%)",
+    y = "Density"
+  )
+
+ggsave(
+  "Figure_S2_PSA_Density.png",
+  fig_S2,
+  width = 11,
+  height = 6,
+  dpi = 350
+)
+
+###############################################################
+# FIGURE S3
+# PSA VIOLIN PLOT
+###############################################################
+
+fig_S3 <- ggplot(
+  psa_results %>%
+    filter(
+      Scenario %in%
+        c(
+          "Annual AB",
+          "Biannual AB"
+        )
+    ),
+  aes(
+    Scenario,
+    VL_Saved_percent,
+    fill = Scenario
+  )
+) +
+  geom_violin(
+    alpha = 0.7
+  ) +
+  geom_boxplot(
+    width = 0.12,
+    fill = "white"
+  ) +
+  theme_classic(base_size = 18) +
+  labs(
+    y = "VL Tests Saved (%)",
+    x = NULL
+  )
+
+ggsave(
+  "Figure_S3_PSA_Violin.png",
+  fig_S3,
+  width = 7,
+  height = 6,
+  dpi = 300
+)
+
+###############################################################
+# OPTIONAL FIGURE S4
+# DELAY DISTRIBUTIONS
+###############################################################
+
+fig_S4 <- ggplot(
+  psa_results %>%
+    filter(
+      Scenario %in%
+        c(
+          "Annual AB",
+          "Biannual AB"
+        )
+    ),
+  aes(
+    x = Mean_delay_months,
+    fill = Scenario
+  )
+) +
+  geom_density(
+    alpha = 0.4
+  ) +
+  theme_classic(base_size = 18) +
+  labs(
+    x = "Mean Detection Delay (Months)",
+    y = "Density"
+  )
+
+ggsave(
+  "Figure_S4_Delay_Distribution.png",
+  fig_S4,
+  width = 9,
+  height = 6,
+  dpi = 300
+)
+
+###############################################################
+# SAVE PSA DATASET
+###############################################################
+
+write.csv(
+  psa_results,
+  "PSA_Full_Results.csv",
+  row.names = FALSE
+)
+
+cat(
+  "\nAll uncertainty analyses completed successfully.\n"
+)
